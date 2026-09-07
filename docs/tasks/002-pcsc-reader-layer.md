@@ -4,6 +4,7 @@
 > References: [../plans/prd.md FR-2/FR-4/FR-5](../plans/prd.md) · [../plans/architecture.md §4/§5](../plans/architecture.md) · [../rules/pcsc-reader.md](../rules/pcsc-reader.md)
 
 ## Goal
+
 Get the physical ACR122U working end-to-end with console output only: read a card UID and print it, before any WebSocket layer exists.
 
 ```
@@ -11,6 +12,7 @@ Node.js → PC/SC → ACR122U → console
 ```
 
 ## Steps
+
 1. Implement `src/reader/types.ts`: `ReaderManager` interface + event types (reader connected/disconnected, card inserted/removed, UID).
 2. Implement `src/reader/PcscReader.ts` wrapping `nfc-pcsc`:
    - initialize PC/SC on start
@@ -28,6 +30,7 @@ Node.js → PC/SC → ACR122U → console
 6. Add unit tests for `utils/uid.ts`.
 
 ## Checklist
+
 - [ ] Card UID prints to console as normalized uppercase hex
 - [ ] Card removal prints `Card removed`
 - [ ] No reader → agent stays alive

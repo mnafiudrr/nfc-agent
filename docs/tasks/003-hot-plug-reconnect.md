@@ -4,6 +4,7 @@
 > References: [../plans/prd.md FR-3](../plans/prd.md) · [../plans/architecture.md §6](../plans/architecture.md) · [../diagrams/state-machine.puml](../diagrams/state-machine.puml)
 
 ## Goal
+
 Survive reader plug/unplug/replug without restarting the process.
 
 ```
@@ -13,6 +14,7 @@ plug → detect again
 ```
 
 ## Steps
+
 1. Implement `src/reader/ReaderManager.ts` as an explicit state machine:
    - `STARTING → WAITING_FOR_READER → READER_CONNECTED → WAITING_FOR_CARD ⇄ CARD_PRESENT`
    - Reader removal from any relevant state → `WAITING_FOR_READER`.
@@ -23,6 +25,7 @@ plug → detect again
 6. Verify manually: plug → connect, unplug → disconnect, plug → connect again, all in one process run.
 
 ## Checklist
+
 - [ ] Unplugging logs `Reader disconnected`, process stays alive
 - [ ] Replugging logs `Reader connected` without restart
 - [ ] State transition unit tests pass

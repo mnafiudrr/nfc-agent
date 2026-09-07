@@ -14,6 +14,7 @@ Node.js → PC/SC → ACR122U → console
 ```
 
 Success:
+
 - Reader connected
 - Card detected, UID printed (normalized)
 - Card removed
@@ -27,6 +28,7 @@ This validates the PC/SC driver, reader detection, card reading, and UID normali
 Goal: survive plug/unplug/replug without restarting the process.
 
 Success:
+
 - plug → detect
 - unplug → detect
 - plug → detect again

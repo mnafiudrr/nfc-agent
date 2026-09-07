@@ -4,6 +4,7 @@
 > References: [../plans/prd.md FR-6/FR-7](../plans/prd.md) · [../plans/architecture.md §7](../plans/architecture.md) · [../diagrams/data-flow.puml](../diagrams/data-flow.puml)
 
 ## Goal
+
 Broadcast reader/card events to WebSocket clients.
 
 ```
@@ -11,6 +12,7 @@ ACR122U → Agent → WebSocket → Test client
 ```
 
 ## Steps
+
 1. Implement `src/websocket/messages.ts`: typed message builders/serializers for:
    - `reader_status` (connected/disconnected, with reader name)
    - `card_detected` (normalized UID)
@@ -27,6 +29,7 @@ ACR122U → Agent → WebSocket → Test client
 6. Verify with a small test WebSocket client (see [../diagrams/data-flow.puml](../diagrams/data-flow.puml)) that it receives all reader/card events.
 
 ## Checklist
+
 - [ ] Test client receives `reader_status` on connect
 - [ ] Test client receives `card_detected` / `card_removed`
 - [ ] Multiple clients each receive events

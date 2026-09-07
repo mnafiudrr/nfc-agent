@@ -4,6 +4,7 @@
 > References: [../README.md §9](../README.md) · [../plans/prd.md](../plans/prd.md)
 
 ## Goal
+
 Verify the agent against a physical ACR122U-A9 using the 10-test checklist. Run each test and record the observed result.
 
 ## Tests
@@ -43,15 +44,16 @@ Connect two WebSocket clients, tap a card.
 Expected: both clients receive `card_detected`.
 
 ## Checklist
-| Test | Expected | Observed | Pass |
-| ---- | -------- | -------- | ---- |
-| 1 | Stays alive, no reader | | |
-| 2 | Reader connected | | |
-| 3 | Card detected + UID | | |
-| 4 | One event, no spam | | |
-| 5 | Card removed | | |
-| 6 | Card detected again | | |
-| 7 | Reader disconnected, alive | | |
-| 8 | Reader connected, no restart | | |
-| 9 | Agent continues running | | |
-| 10 | Both clients get event | | |
+
+| Test | Expected                     | Observed | Pass |
+| ---- | ---------------------------- | -------- | ---- |
+| 1    | Stays alive, no reader       |          |      |
+| 2    | Reader connected             |          |      |
+| 3    | Card detected + UID          |          |      |
+| 4    | One event, no spam           |          |      |
+| 5    | Card removed                 |          |      |
+| 6    | Card detected again          |          |      |
+| 7    | Reader disconnected, alive   |          |      |
+| 8    | Reader connected, no restart |          |      |
+| 9    | Agent continues running      |          |      |
+| 10   | Both clients get event       |          |      |

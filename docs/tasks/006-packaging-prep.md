@@ -4,9 +4,11 @@
 > References: [../plans/implementation-plan.md](../plans/implementation-plan.md) · [../plans/prd.md](../plans/prd.md)
 
 ## Goal
+
 Prepare for distributing the agent as an executable so an end user can run it **without installing Node.js**. Do **not** implement the installer yet.
 
 ## Steps
+
 1. Evaluate packaging tools per target:
    - **Windows** → executable (e.g. `pkg` / `nexe` / `bun compile` — decide in this task)
    - **macOS** → executable (same toolset or platform-native)
@@ -16,6 +18,7 @@ Prepare for distributing the agent as an executable so an end user can run it **
 5. Leave the actual installer to a later phase.
 
 ## Checklist
+
 - [ ] Target executable builds for Windows and/or macOS
 - [ ] Executable can run without a local Node.js install
 - [ ] Native PC/SC binding works when packaged (or fallback documented)

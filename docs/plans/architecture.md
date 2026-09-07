@@ -77,6 +77,7 @@ The reader layer owns:
 `PcscReader` wraps `nfc-pcsc` and translates its events into reader-layer events (reader connected/disconnected, card inserted/removed, UID read).
 
 ### Reader identification
+
 - Prefer identifying via the PC/SC reader name (e.g. `ACS ACR122U PICC Interface`).
 - Do not hardcode one exact string. Match an ACR122U-compatible token and tolerate minor Windows/macOS differences.
 - Log all detected readers; ignore unrelated readers when an ACR122U is present.
@@ -113,11 +114,11 @@ Message serialization lives in `websocket/messages.ts` and follows [prd.md §7](
 
 `config.ts` reads environment variables with defaults:
 
-| Env | Default | Description |
-| --- | ------- | ----------- |
-| `WS_HOST` | `127.0.0.1` | WebSocket bind host (loopback) |
-| `WS_PORT` | `8765` | WebSocket port |
-| `LOG_LEVEL` | `info` | `debug` \| `info` \| `warn` \| `error` |
+| Env         | Default     | Description                            |
+| ----------- | ----------- | -------------------------------------- |
+| `WS_HOST`   | `127.0.0.1` | WebSocket bind host (loopback)         |
+| `WS_PORT`   | `8765`      | WebSocket port                         |
+| `LOG_LEVEL` | `info`      | `debug` \| `info` \| `warn` \| `error` |
 
 ## 9. Graceful shutdown
 
