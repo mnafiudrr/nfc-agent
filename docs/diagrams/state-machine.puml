@@ -1,0 +1,37 @@
+@startuml
+!theme plain
+skinparam defaultFontName "Segoe UI"
+skinparam stateBackgroundColor #F5F9FF
+skinparam stateBorderColor #2D6CDF
+skinparam stateArrowColor #2D6CDF
+skinparam stateStartBackgroundColor #2D6CDF
+skinparam stateEndBackgroundColor #E89B2D
+
+title ACR122U Local Agent — Reader/Card State Machine
+
+[*] --> STARTING : start
+
+state STARTING
+state WAITING_FOR_READER
+state READER_CONNECTED
+state WAITING_FOR_CARD
+state CARD_PRESENT
+
+STARTING --> WAITING_FOR_READER : PC/SC initialized
+
+WAITING_FOR_READER --> WAITING_FOR_READER : poll / no reader
+WAITING_FOR_READER --> READER_CONNECTED : reader connected\n(log "Reader connected")
+
+READER_CONNECTED --> WAITING_FOR_CARD : ready to monitor
+READER_CONNECTED --> WAITING_FOR_READER : reader disconnected\n(log "Reader disconnected")
+
+WAITING_FOR_CARD --> CARD_PRESENT : card inserted\n(log "Card detected", read UID)
+WAITING_FOR_CARD --> WAITING_FOR_READER : reader disconnected
+
+CARD_PRESENT --> CARD_PRESENT : card remains (no duplicate event)
+CARD_PRESENT --> WAITING_FOR_CARD : card removed\n(log "Card removed")
+CARD_PRESENT --> WAITING_FOR_READER : reader disconnected
+
+[*] --> WAITING_FOR_READER : hot-plug\n(replug from any state)
+
+@enduml

@@ -1,0 +1,44 @@
+@startuml
+!theme plain
+skinparam defaultFontName "Segoe UI"
+skinparam ComponentBackgroundColor #F5F9FF
+skinparam ComponentBorderColor #2D6CDF
+skinparam ArrowColor #2D6CDF
+skinparam NoteBackgroundColor #FFFBEA
+skinparam NoteBorderColor #E89B2D
+skinparam packageStyle rectangle
+
+title ACR122U Local Agent — Component Architecture
+
+package "External (NOT in this repo)" {
+  [Browser / Client\n(Yii2, React, Svelte, HTML, ...)] as Client
+}
+
+package "ACR122U Agent (Node.js + TypeScript)" {
+  [WebSocketServer\n(ws, 127.0.0.1:8765)] as WS
+  [ReaderManager\n(state machine)] as RM
+  [PcscReader\n(nfc-pcsc)] as PCSC
+  [uid.ts\n(normalize UID)] as UID
+}
+
+[ACR122U-A9\n(NFC Reader)] as Reader
+
+Client --> WS : WebSocket (JSON events)
+WS --> RM : reader/card events
+RM --> PCSC : start/stop/monitor
+PCSC --> UID : raw card bytes
+PCSC --> Reader : USB
+UID --> RM : normalized UID
+
+note bottom of WS
+  Binds only to 127.0.0.1.
+  Never 0.0.0.0. Read-only server.
+end note
+
+note bottom of RM
+  STARTING → WAITING_FOR_READER
+  → READER_CONNECTED → WAITING_FOR_CARD
+  ⇄ CARD_PRESENT
+end note
+
+@enduml

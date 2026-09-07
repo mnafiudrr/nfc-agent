@@ -1,0 +1,70 @@
+@startuml
+!theme plain
+skinparam defaultFontName "Segoe UI"
+skinparam sequenceArrowColor #2D6CDF
+skinparam ParticipantBackgroundColor #F5F9FF
+skinparam ParticipantBorderColor #2D6CDF
+skinparam NoteBackgroundColor #FFFBEA
+skinparam NoteBorderColor #E89B2D
+
+title ACR122U Local Agent — Event Flow (Sequence)
+
+actor "ACR122U" as Reader
+participant "Agent\n(ReaderManager)" as Agent
+participant "WebSocketServer\n127.0.0.1:8765" as WS
+participant "Client A" as C1
+participant "Client B" as C2
+
+== Hot-plug: reader connected ==
+
+Reader -> Agent : reader connected (PC/SC)
+Agent -> Agent : state: WAITING_FOR_READER → READER_CONNECTED
+Agent -> WS : reader_status { connected, "ACS ACR122U" }
+WS -> C1 : reader_status
+WS -> C2 : reader_status
+
+== Client connect: immediate status ==
+
+C1 -> WS : connect
+WS -> C1 : reader_status { connected, reader }
+
+== Card inserted ==
+
+Reader -> Agent : card inserted
+Agent -> Agent : read + normalize UID\n(state: CARD_PRESENT)
+Agent -> WS : card_detected { uid }
+WS -> C1 : card_detected
+WS -> C2 : card_detected
+
+note over Agent
+  No duplicate card_detected
+  while the same card remains.
+end note
+
+== Card removed ==
+
+Reader -> Agent : card removed
+Agent -> Agent : state: WAITING_FOR_CARD
+Agent -> WS : card_removed
+WS -> C1 : card_removed
+WS -> C2 : card_removed
+
+== Client disconnect ==
+
+C2 -> WS : disconnect
+WS -> C1 : (continues to receive events)
+note over Agent, WS
+  Agent keeps monitoring the reader;
+  client disconnect never stops it.
+end note
+
+== Hot-plug: reader disconnected / replugged ==
+
+Reader -> Agent : reader disconnected
+Agent -> WS : reader_status { disconnected, reader }
+WS -> C1 : reader_status
+Agent -> Agent : state: WAITING_FOR_READER
+Reader -> Agent : reader connected again
+Agent -> WS : reader_status { connected, reader }
+
+@enduml
