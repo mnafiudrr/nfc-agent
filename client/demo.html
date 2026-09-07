@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ACR122U Agent — Browser Demo</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 2rem;
+        max-width: 640px;
+      }
+      .status {
+        font-weight: 600;
+      }
+      .log {
+        background: #f5f5f5;
+        border-radius: 6px;
+        padding: 1rem;
+        max-height: 300px;
+        overflow: auto;
+        margin-top: 1rem;
+      }
+      .log p {
+        margin: 0.15rem 0;
+        font-family: ui-monospace, monospace;
+      }
+      button {
+        padding: 0.5rem 1rem;
+        margin-right: 0.5rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>ACR122U Agent — Browser Demo</h1>
+    <p class="status" id="connection">Connecting…</p>
+    <button id="connect" type="button">Connect</button>
+    <button id="disconnect" type="button">Disconnect</button>
+    <div class="log" id="log"></div>
+
+    <script type="module">
+      import { Acr122uAgentClient } from './acr122u-client.js';
+
+      const connectionEl = document.getElementById('connection');
+      const logEl = document.getElementById('log');
+
+      function log(message) {
+        const p = document.createElement('p');
+        p.textContent = `${new Date().toLocaleTimeString()}  ${message}`;
+        logEl.prepend(p);
+      }
+
+      const agent = new Acr122uAgentClient();
+
+      agent.onStatus((status) => {
+        connectionEl.textContent = `Connection: ${status}`;
+        log(`connection → ${status}`);
+      });
+
+      agent.on('reader_status', (msg) => {
+        log(`reader_status → ${msg.status} (${msg.reader || 'no reader'})`);
+      });
+
+      agent.on('card_detected', (msg) => {
+        log(`card_detected → UID ${msg.uid}`);
+      });
+
+      agent.on('card_removed', () => {
+        log('card_removed');
+      });
+
+      document.getElementById('connect').addEventListener('click', () => agent.connect());
+      document.getElementById('disconnect').addEventListener('click', () => agent.disconnect());
+
+      agent.connect();
+    </script>
+  </body>
+</html>

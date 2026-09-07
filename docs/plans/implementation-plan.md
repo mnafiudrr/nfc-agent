@@ -68,7 +68,10 @@ Goal: production-grade reliability.
 Goal: prepare for distributing an executable so the user can run the agent without installing Node.js.
 
 - Identify packaging approach per target (Windows → executable, macOS → executable).
+- Catalog all target executables and build commands.
 - Do **not** implement the installer yet.
+
+**Document:** [packaging.md](packaging.md)
 
 **Task:** [../tasks/006-packaging-prep.md](../tasks/006-packaging-prep.md)
 

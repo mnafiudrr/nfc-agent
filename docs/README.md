@@ -25,12 +25,14 @@ External Client
 
 | Path                                                         | Description                                                                |
 | ------------------------------------------------------------ | -------------------------------------------------------------------------- |
-| [plans/prd.md](plans/prd.md)                                 | Product requirements (goals, non-goals, functional requirements, protocol) |
-| [plans/architecture.md](plans/architecture.md)               | Technical design: stack, structure, modules, state machine, config         |
-| [plans/implementation-plan.md](plans/implementation-plan.md) | Milestone breakdown (M1–M5)                                                |
-| [tasks/README.md](tasks/README.md)                           | Execution order index for implementation tasks                             |
-| [rules/README.md](rules/README.md)                           | Coding/engineering rules for this project                                  |
-| [diagrams/architecture.puml](diagrams/architecture.puml)     | Component diagram                                                          |
+| [plans/prd.md](plans/prd.md) | Product requirements (goals, non-goals, functional requirements, protocol) |
+| [plans/architecture.md](plans/architecture.md) | Technical design: stack, structure, modules, state machine, config |
+| [plans/implementation-plan.md](plans/implementation-plan.md) | Milestone breakdown (M1–M5) |
+| [plans/packaging.md](plans/packaging.md) | Building an installable app for macOS & Windows (all target executables) |
+| [tasks/README.md](tasks/README.md) | Execution order index for implementation tasks |
+| [rules/README.md](rules/README.md) | Coding/engineering rules for this project |
+| [../client/README.md](../client/README.md) | Browser WebSocket client integration module |
+| [diagrams/architecture.puml](diagrams/architecture.puml) | Component diagram |
 | [diagrams/state-machine.puml](diagrams/state-machine.puml)   | Reader/card state machine                                                  |
 | [diagrams/data-flow.puml](diagrams/data-flow.puml)           | Event flow sequence                                                        |
 
