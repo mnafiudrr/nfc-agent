@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ACR122U Agent — Website Integration Sample</title>
+    <style>
+      :root {
+        --ok: #16a34a;
+        --warn: #d97706;
+        --err: #dc2626;
+        --muted: #6b7280;
+        --border: #e5e7eb;
+      }
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 0 auto;
+        padding: 2rem 1.5rem;
+        max-width: 720px;
+        color: #111827;
+      }
+      h1 {
+        font-size: 1.4rem;
+        margin-bottom: 0.25rem;
+      }
+      .subtitle {
+        color: var(--muted);
+        margin-top: 0;
+      }
+      .banner {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 0.75rem 1rem;
+        margin: 1rem 0;
+        font-size: 0.9rem;
+      }
+      .banner.warn {
+        background: #fffbeb;
+        border-color: #fcd34d;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin: 1rem 0;
+      }
+      .card {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 1rem;
+      }
+      .card h2 {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--muted);
+        margin: 0 0 0.5rem;
+      }
+      .pill {
+        display: inline-block;
+        padding: 0.15rem 0.6rem;
+        border-radius: 999px;
+        font-size: 0.8rem;
+        font-weight: 600;
+      }
+      .pill.ok {
+        background: #dcfce7;
+        color: var(--ok);
+      }
+      .pill.pending {
+        background: #fef3c7;
+        color: var(--warn);
+      }
+      .pill.err {
+        background: #fee2e2;
+        color: var(--err);
+      }
+      .uid {
+        font-family: ui-monospace, monospace;
+        font-size: 1.6rem;
+        letter-spacing: 0.08em;
+        word-break: break-all;
+      }
+      .hint {
+        font-size: 0.85rem;
+        color: var(--muted);
+      }
+      .log {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 0.75rem 1rem;
+        max-height: 220px;
+        overflow: auto;
+        font-family: ui-monospace, monospace;
+        font-size: 0.8rem;
+        background: #f9fafb;
+      }
+      .log p {
+        margin: 0.15rem 0;
+      }
+      fieldset {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        margin: 1rem 0;
+      }
+      label {
+        display: block;
+        font-size: 0.85rem;
+        margin: 0.5rem 0 0.15rem;
+      }
+      input[type='url'],
+      input[type='text'] {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 0.4rem 0.5rem;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        font-size: 0.9rem;
+      }
+      .footnote {
+        color: var(--muted);
+        font-size: 0.8rem;
+        margin-top: 1.5rem;
+      }
+      code {
+        background: #f3f4f6;
+        padding: 0.1rem 0.3rem;
+        border-radius: 4px;
+        font-size: 0.85em;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>ACR122U Agent — Website Integration Sample</h1>
+    <p class="subtitle">
+      A drop-in reference page: connects the browser to the local ACR122U agent and (optionally)
+      forwards card taps to your backend. Works when this page is served over
+      <strong>http</strong> or <strong>https</strong>.
+    </p>
+
+    <div class="banner" id="protocol-banner"></div>
+    <div class="banner warn" id="safari-banner" hidden>
+      ⚠️ You appear to be using Safari. Safari does not reliably allow https pages to open
+      <code>ws://127.0.0.1</code>. Use Chrome, Edge, or Firefox on this machine.
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h2>Agent connection</h2>
+        <span class="pill pending" id="conn-pill">connecting…</span>
+        <p class="hint" id="conn-hint" hidden>
+          Agent not detected. Make sure the ACR122U agent is installed and running on
+          <strong>this computer</strong>, then reload the page.
+        </p>
+      </div>
+      <div class="card">
+        <h2>NFC reader</h2>
+        <span class="pill pending" id="reader-pill">no reader</span>
+        <p class="hint" id="reader-name"></p>
+      </div>
+      <div class="card">
+        <h2>Last card UID</h2>
+        <p class="uid" id="last-uid">—</p>
+        <p class="hint">Uppercase hex, no separators</p>
+      </div>
+    </div>
+
+    <fieldset>
+      <legend>Forward taps to your backend (optional)</legend>
+      <label
+        ><input type="checkbox" id="backend-enabled" />
+        Send each card_detected UID to my backend endpoint</label
+      >
+      <label for="backend-url">Endpoint URL (must be https when this page is https)</label>
+      <input type="url" id="backend-url" placeholder="https://nfcreader.com/attendance/tap" />
+      <label for="csrf-token">CSRF token (e.g. Yii2 <code>csrfToken</code>) — optional</label>
+      <input type="text" id="csrf-token" placeholder="paste your site's CSRF token here" />
+    </fieldset>
+
+    <h2 style="font-size: 1rem">Event log</h2>
+    <div class="log" id="log"></div>
+
+    <p class="footnote">
+      This page connects to <code>ws://127.0.0.1:8765</code> (the agent's loopback-only
+      WebSocket). Your server never connects to the agent — only the user's browser does.
+    </p>
+
+    <script type="module">
+      import { Acr122uAgentClient, DEFAULT_URL } from '../acr122u-client.js';
+
+      // ---------- page elements ----------
+      const $ = (id) => document.getElementById(id);
+      const protocolBanner = $('protocol-banner');
+      const safariBanner = $('safari-banner');
+      const connPill = $('conn-pill');
+      const connHint = $('conn-hint');
+      const readerPill = $('reader-pill');
+      const readerName = $('reader-name');
+      const lastUid = $('last-uid');
+      const logEl = $('log');
+      const backendEnabled = $('backend-enabled');
+      const backendUrl = $('backend-url');
+      const csrfToken = $('csrf-token');
+
+      // ---------- protocol banner (http vs https) ----------
+      // Both protocols are supported: browsers treat 127.0.0.1 as a
+      // "potentially trustworthy" origin, so an https page may still open
+      // ws://127.0.0.1:8765 (Chrome / Edge / Firefox).
+      const isHttps = location.protocol === 'https:';
+      protocolBanner.innerHTML = isHttps
+        ? '✅ This page is served over <strong>https</strong>. Connecting to the local agent at ' +
+          '<code>' + DEFAULT_URL + '</code> is allowed in Chrome, Edge, and Firefox.'
+        : '✅ This page is served over <strong>http</strong>. Connecting to the local agent at ' +
+          '<code>' + DEFAULT_URL + '</code> works in all modern browsers.';
+
+      // ---------- Safari check ----------
+      const isSafari =
+        /^((?!chrome|android|crios|fxios).)*safari/i.test(navigator.userAgent);
+      if (isSafari) safariBanner.hidden = false;
+
+      // ---------- event log ----------
+      function log(message) {
+        const p = document.createElement('p');
+        p.textContent = `${new Date().toLocaleTimeString()}  ${message}`;
+        logEl.prepend(p);
+      }
+
+      // ---------- optional backend forwarding ----------
+      // Demonstrates the "browser-mediated" flow: the page receives the tap
+      // from the local agent and POSTs it to your website's backend.
+      // The CSRF token is sent both as a header and as a body param so it
+      // works with Yii2 (and most other frameworks) out of the box.
+      async function forwardToBackend(uid) {
+        if (!backendEnabled.checked || !backendUrl.value.trim()) return;
+        const body = new URLSearchParams();
+        body.set('uid', uid);
+        const csrf = csrfToken.value.trim();
+        if (csrf) body.set('_csrf', csrf);
+        try {
+          const res = await fetch(backendUrl.value.trim(), {
+            method: 'POST',
+            headers: csrf ? { 'X-CSRF-Token': csrf } : {},
+            body,
+          });
+          log(`backend → ${res.status} ${res.statusText}`);
+        } catch (err) {
+          log(`backend error → ${err.message}`);
+        }
+      }
+
+      // ---------- agent client ----------
+      const agent = new Acr122uAgentClient({ url: DEFAULT_URL });
+
+      agent.onStatus((status) => {
+        log(`connection → ${status}`);
+        if (status === 'open') {
+          connPill.textContent = 'connected';
+          connPill.className = 'pill ok';
+          connHint.hidden = true;
+        } else if (status === 'connecting') {
+          connPill.textContent = 'connecting…';
+          connPill.className = 'pill pending';
+        } else {
+          connPill.textContent = 'not connected';
+          connPill.className = 'pill err';
+          connHint.hidden = false;
+        }
+      });
+
+      agent.on('reader_status', (msg) => {
+        log(`reader_status → ${msg.status} (${msg.reader || 'no reader'})`);
+        if (msg.status === 'connected') {
+          readerPill.textContent = 'connected';
+          readerPill.className = 'pill ok';
+          readerName.textContent = msg.reader;
+        } else {
+          readerPill.textContent = 'no reader';
+          readerPill.className = 'pill pending';
+          readerName.textContent = 'waiting for an ACR122U to be plugged in…';
+        }
+      });
+
+      agent.on('card_detected', (msg) => {
+        log(`card_detected → ${msg.uid}`);
+        lastUid.textContent = msg.uid;
+        forwardToBackend(msg.uid);
+      });
+
+      agent.on('card_removed', () => {
+        log('card_removed');
+      });
+
+      agent.connect();
+    </script>
+  </body>
+</html>

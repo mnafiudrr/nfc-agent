@@ -31,7 +31,7 @@ External Client
 | [plans/packaging.md](plans/packaging.md) | Building an installable app for macOS & Windows (all target executables) |
 | [tasks/README.md](tasks/README.md) | Execution order index for implementation tasks |
 | [rules/README.md](rules/README.md) | Coding/engineering rules for this project |
-| [../client/README.md](../client/README.md) | Browser WebSocket client integration module |
+| [../client/README.md](../client/README.md) | Browser WebSocket client module + website sample (http/https) |
 | [diagrams/architecture.puml](diagrams/architecture.puml) | Component diagram |
 | [diagrams/state-machine.puml](diagrams/state-machine.puml)   | Reader/card state machine                                                  |
 | [diagrams/data-flow.puml](diagrams/data-flow.puml)           | Event flow sequence                                                        |

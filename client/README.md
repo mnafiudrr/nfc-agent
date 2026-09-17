@@ -13,7 +13,9 @@ The agent stays fully independent — it only exposes events over the local WebS
 | File | Purpose |
 | ---- | ------- |
 | `acr122u-client.js` | The client module (works in any browser, no build step) |
-| `demo.html` | A test page: open it in a browser to see live events |
+| `acr122u-client.d.ts` | TypeScript definitions (place next to the .js) |
+| `demo.html` | Minimal test page: open directly to see live events |
+| [`sample/`](sample/README.md) | Full website-integration sample (http **and** https) with backend forwarding + Yii2 notes |
 
 ## Usage
 
@@ -55,8 +57,22 @@ const agent = new Acr122uAgentClient({
 
 The client mirrors the agent's WebSocket protocol (see [../docs/README.md §8](../docs/README.md)).
 
-## Browser security notes
+## Protocol support (http and https)
 
-- The browser must be able to reach `ws://127.0.0.1:8765`. This works when the page is served over `http://` (or `file://`).
-- An **https**-served page cannot open an insecure `ws://` connection (mixed-content block). For an https site, you would need to add a secure local tunnel/reverse proxy to the agent in front of the WebSocket — out of scope for the agent itself.
-- The client is read-only and sends no commands.
+The agent WebSocket is plain `ws://` bound to `127.0.0.1`. **Both http and https websites can connect to it directly** — no wss, no proxy, no changes to the agent:
+
+| Page protocol | Connection to the agent | Works? |
+| ------------- | ----------------------- | ------ |
+| `http://` | `ws://127.0.0.1:8765` | ✅ all modern browsers |
+| `https://` | `ws://127.0.0.1:8765` | ✅ Chrome / Edge / Firefox |
+
+Why https works: browsers treat `127.0.0.1` / `localhost` as *potentially trustworthy* origins, so the mixed-content rule that normally blocks `ws://` from https pages does **not** apply to loopback addresses.
+
+Notes:
+
+- Prefer `127.0.0.1` over `localhost` in the URL — `localhost` may resolve to IPv6 `::1` first, while the agent binds IPv4 loopback only.
+- **Safari** is not reliably supported for the https → `ws://127.0.0.1` case.
+- The user's browser must run on the **same laptop** as the agent. Your server never connects to the agent.
+- The client is read-only and sends no commands to the agent.
+
+See [`sample/`](sample/README.md) for a working reference page covering both protocols.
