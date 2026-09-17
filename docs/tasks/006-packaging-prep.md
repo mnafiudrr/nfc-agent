@@ -10,7 +10,7 @@ Prepare for distributing the agent as an executable so an end user can run it **
 ## Steps
 
 1. Evaluate packaging tools per target:
-   - **Windows** → executable (e.g. `pkg` / `nexe` / `bun compile` — decide in this task)
+   - **Windows** → executable (e.g. `pkg` / `nexe` — Bun is excluded, decide in this task)
    - **macOS** → executable (same toolset or platform-native)
 2. Confirm the chosen tool bundles native deps correctly (`nfc-pcsc` is a native/`node-gyp` module; verify it survives packaging, or switch to a pure-JS/alternative PC/SC binding if needed).
 3. Add a build step that produces the target executable.

@@ -24,10 +24,14 @@ Packaging must still work against the physical ACR122U through PC/SC, which is t
 
 ### 3.1 Single-binary executable (attempt first)
 
-Produce one self-contained binary per OS/arch. Candidate tools:
+Produce one self-contained binary per OS/arch.
 
-- **Bun** — `bun build --compile ./dist/index.js --outfile <name>` → native standalone executable.
-- **pkg (Vercel)** — `pkg dist/index.js -t node18-macos-arm64,node18-macos-x64,node18-win-x64` → per-platform executables.
+> **Tool decision (Windows):** `pkg` (`@yao-pkg/pkg`) — see [windows-exe.md](windows-exe.md).
+> **Bun is excluded.** The project runs on Node/npm (`npm run dev`), and `@pokusew/pcsclite` is a classic V8-ABI addon (`NODE_MODULE`, not N-API); Bun's JavaScriptCore runtime only supports N-API addons, so `bun build --compile` cannot run it. macOS tooling is still pending (Milestone 5).
+
+Candidate tools:
+
+- **pkg (`@yao-pkg/pkg`)** — `pkg .` reads `package.json` and produces per-platform executables; ships a real V8-based Node runtime, so the native addon loads as on a normal Node install.
 - **nexe** — `nexe -t macos-arm64,win-x64` → per-platform executables.
 
 > Caveat: native modules (`.node` files for `pcsclite`) are **not** always embeddable into the single file. If the produced binary cannot find the native addon, fall back to §3.2.
@@ -68,22 +72,14 @@ Ship the Node runtime + `dist/` + `node_modules` (including the platform-specifi
 npm ci
 npm run build
 
-# Single binary (arm64 on Apple Silicon)
-bun build --compile ./dist/index.js --outfile dist/bin/darwin-arm64/acr122u-agent
-
-# x64 variant (build on/for Intel, or cross-compile)
-bun build --compile ./dist/index.js --outfile dist/bin/darwin-x64/acr122u-agent
-
-# Optional: combine into a universal binary
-lipo -create dist/bin/darwin-arm64/acr122u-agent dist/bin/darwin-x64/acr122u-agent \
-  -output dist/bin/darwin-universal/acr122u-agent
-
 # .app bundle layout
 mkdir -p dist-app/acr122u-agent.app/Contents/{MacOS,Resources}
 cp dist/bin/darwin-arm64/acr122u-agent dist-app/acr122u-agent.app/Contents/MacOS/acr122u-agent
 cp info.plist dist-app/acr122u-agent.app/Contents/Info.plist
 codesign --force --deep -s - dist-app/acr122u-agent.app   # ad-hoc signing
 ```
+
+> The macOS single-binary build command is **not decided yet** (Bun is excluded; macOS tooling is pending Milestone 5). The `.app` layout above assumes the binary already exists at `dist/bin/darwin-arm64/acr122u-agent`.
 
 ## 6. Windows build commands
 
@@ -92,11 +88,14 @@ npm ci
 npm run build
 
 # x64
-bun build --compile ./dist/index.js --outfile dist/bin/win-x64/acr122u-agent.exe
-
-# x86 (optional)
-bun build --compile ./dist/index.js --outfile dist/bin/win-x86/acr122u-agent.exe
+npx @yao-pkg/pkg . --output dist/bin/win-x64/acr122u-agent.exe
 ```
+
+> Requires the `pkg` config block in `package.json` and building **on Windows** — see [windows-exe.md](windows-exe.md) for prerequisites, config, and verification.
+
+The x86 variant (`dist/bin/win-x86/acr122u-agent.exe`) is optional and not yet implemented.
+
+> Full step-by-step instructions (prerequisites, `pkg` config, CI example, verification, troubleshooting) live in [windows-exe.md](windows-exe.md).
 
 If native `pcsclite` cannot be embedded, bundle instead:
 

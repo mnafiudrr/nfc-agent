@@ -29,6 +29,7 @@ External Client
 | [plans/architecture.md](plans/architecture.md) | Technical design: stack, structure, modules, state machine, config |
 | [plans/implementation-plan.md](plans/implementation-plan.md) | Milestone breakdown (M1–M5) |
 | [plans/packaging.md](plans/packaging.md) | Building an installable app for macOS & Windows (all target executables) |
+| [plans/windows-exe.md](plans/windows-exe.md) | Step-by-step guide for building the Windows x64 `acr122u-agent.exe` |
 | [tasks/README.md](tasks/README.md) | Execution order index for implementation tasks |
 | [rules/README.md](rules/README.md) | Coding/engineering rules for this project |
 | [../client/README.md](../client/README.md) | Browser WebSocket client module + website sample (http/https) |
