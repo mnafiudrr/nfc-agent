@@ -59,3 +59,8 @@ test('non-windows platforms get the noop controller', async () => {
     assert.ok(tray instanceof NoopTrayController, `${platform} should not build a Win32 tray`);
   }
 });
+
+test('noop controller accepts notifications without side effects', () => {
+  const tray = new NoopTrayController();
+  assert.doesNotThrow(() => tray.notify('ACR122U Agent', 'Device is plugged'));
+});

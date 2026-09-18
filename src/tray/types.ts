@@ -22,4 +22,6 @@ export interface TrayController {
   start(): void;
   stop(): void;
   setStatus(status: TrayStatus): void;
+  /** Shows a desktop notification from the tray icon. */
+  notify(title: string, message: string): void;
 }

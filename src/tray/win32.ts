@@ -17,6 +17,9 @@ export const NIM_DELETE = 2;
 export const NIF_MESSAGE = 0x01;
 export const NIF_ICON = 0x02;
 export const NIF_TIP = 0x04;
+export const NIF_INFO = 0x10;
+
+export const NIIF_INFO = 0x01;
 
 export const WM_APP = 0x8000;
 export const WM_LBUTTONUP = 0x0202;

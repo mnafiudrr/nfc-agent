@@ -86,8 +86,14 @@ async function main(): Promise<void> {
   );
   tray.start();
 
-  readerManager.on('readerConnected', refreshTray);
-  readerManager.on('readerDisconnected', refreshTray);
+  readerManager.on('readerConnected', () => {
+    refreshTray();
+    tray.notify('ACR122U Agent', 'Device is plugged');
+  });
+  readerManager.on('readerDisconnected', () => {
+    refreshTray();
+    tray.notify('ACR122U Agent', 'Device is unplugged');
+  });
   readerManager.on('cardDetected', refreshTray);
   readerManager.on('cardRemoved', refreshTray);
 

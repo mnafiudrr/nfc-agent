@@ -10,4 +10,6 @@ export class NoopTrayController implements TrayController {
   stop(): void {}
 
   setStatus(_status: TrayStatus): void {}
+
+  notify(_title: string, _message: string): void {}
 }

@@ -11,11 +11,13 @@ import {
   MF_SEPARATOR,
   MF_STRING,
   NIF_ICON,
+  NIF_INFO,
   NIF_MESSAGE,
   NIF_TIP,
   NIM_ADD,
   NIM_DELETE,
   NIM_MODIFY,
+  NIIF_INFO,
   PM_REMOVE,
   SM_CXSMICON,
   SM_CYSMICON,
@@ -38,6 +40,8 @@ const TRAY_ICON_ID = 1;
 const TRAY_CALLBACK_MESSAGE = WM_APP + 1;
 const PUMP_INTERVAL_MS = 50;
 const TOOLTIP_UNITS = 128;
+const INFO_UNITS = 256;
+const INFO_TITLE_UNITS = 64;
 
 const ID_STATUS = 1;
 const ID_OPEN_LOGS = 2;
@@ -110,6 +114,22 @@ export class Win32TrayController implements TrayController {
       this.api.Shell_NotifyIconW(NIM_MODIFY, this.buildIconData(flags));
     } catch (err) {
       this.log.debug(`Tray status update failed: ${String(err)}`);
+    }
+  }
+
+  notify(title: string, message: string): void {
+    const api = this.api;
+    if (!this.iconAdded || !api) {
+      return;
+    }
+    try {
+      const data = this.buildIconData(NIF_INFO) as Record<string, unknown>;
+      data['szInfo'] = wchars(message, INFO_UNITS);
+      data['szInfoTitle'] = wchars(title, INFO_TITLE_UNITS);
+      data['dwInfoFlags'] = NIIF_INFO;
+      api.Shell_NotifyIconW(NIM_MODIFY, data);
+    } catch (err) {
+      this.log.debug(`Tray notification failed: ${String(err)}`);
     }
   }
 
