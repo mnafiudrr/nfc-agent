@@ -48,8 +48,11 @@ External Client
 
 ## 2. Windows setup
 
-1. Install the official ACR122U driver (ACS / pcsc-shim) and the Windows Smart Card service (Winscard).
-2. Verify the reader appears under **Device Manager → Smart card readers** as `ACS ACR122U PICC Interface`.
+1. Plug in the reader and check **Device Manager → Smart card readers** for `ACS ACR122U PICC Interface`.
+   Windows 10/11 usually bind it to the inbox CCID driver automatically, so no driver install is needed.
+2. Only if it does not appear (or shows under **Other devices**), install the official ACR122U driver
+   (ACS / pcsc-shim) and re-check. The Smart Card service (`SCardSvr`) is built into Windows and
+   trigger-starts on reader arrival — nothing to install or enable.
 3. Install Node.js and npm.
 
 ## 3. macOS setup
@@ -153,7 +156,7 @@ See [tasks/007-manual-hardware-testing.md](tasks/007-manual-hardware-testing.md)
 
 ## 10. Troubleshooting ACR122U detection
 
-- **Reader not listed:** ensure the PC/SC daemon is running; reinstall the platform driver (`pcsc-lite` on macOS, ACS driver on Windows).
+- **Reader not listed:** on macOS ensure the PC/SC daemon is running and install `pcsc-lite` if needed. On Windows check **Device Manager → Smart card readers** — if the reader is missing or sits under **Other devices**, the inbox CCID driver did not bind, so install the ACS driver; re-plug the reader afterwards to fire the `SCardSvr` start trigger.
 - **Name mismatch:** the agent matches reader names containing an ACR122U-compatible token and tolerates minor Win/macOS differences. Run with `LOG_LEVEL=debug` to see all detected readers.
 - **Card not detected:** confirm the card is a PC/SC-visible contactless card; clean the reader surface; check USB connection.
 - **WebSocket clients can't connect:** confirm the client connects to `127.0.0.1:8765` (loopback only by design).

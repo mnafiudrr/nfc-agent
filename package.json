@@ -4,16 +4,26 @@
   "description": "Standalone cross-platform background agent for the ACR122U-A9 NFC reader over PC/SC with a local WebSocket server",
   "type": "module",
   "main": "dist/index.js",
+  "bin": "dist/index.js",
   "engines": {
     "node": ">=18"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "build:exe": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-win-exe.ps1",
     "start": "node dist/index.js",
     "dev": "tsx watch src/index.ts",
     "test": "tsx --test \"test/**/*.test.ts\"",
     "lint": "eslint .",
     "format": "prettier --write ."
+  },
+  "pkg": {
+    "assets": [
+      "node_modules/@pokusew/pcsclite/build/Release/pcsclite.node"
+    ],
+    "targets": [
+      "node22-win-x64"
+    ]
   },
   "dependencies": {
     "nfc-pcsc": "^0.8.1",
