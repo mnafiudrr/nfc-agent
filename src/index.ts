@@ -1,5 +1,5 @@
 import { loadConfig } from './config.js';
-import { ConsoleSink, FileSink, Logger, type LogSink } from './logger.js';
+import { BufferedLogSink, ConsoleSink, FileSink, Logger, type LogSink } from './logger.js';
 import { PcscReader } from './reader/PcscReader.js';
 import { ReaderManagerImpl } from './reader/ReaderManager.js';
 import { createTrayController } from './tray/createTray.js';
@@ -9,7 +9,11 @@ import { WebSocketServer } from './websocket/WebSocketServer.js';
 
 const config = loadConfig();
 
-const sinks: LogSink[] = [new ConsoleSink()];
+// Feeds the tray's live log window; created up front so it captures startup
+// lines logged before the tray exists.
+const logBuffer = new BufferedLogSink();
+
+const sinks: LogSink[] = [new ConsoleSink(), logBuffer];
 if (config.logFile !== null) {
   sinks.push(new FileSink(config.logFile));
 }
@@ -80,6 +84,7 @@ async function main(): Promise<void> {
       wsUrl: `ws://${config.wsHost}:${config.wsPort}`,
       logFile: config.logFile,
       onQuit: () => void shutdown('tray Quit'),
+      logBuffer,
     },
     log,
     config.dataDir,

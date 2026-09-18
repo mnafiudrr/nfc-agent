@@ -1,3 +1,4 @@
+import type { BufferedLogSink } from '../logger.js';
 import type { ReaderInfo, ReaderState } from '../reader/types.js';
 
 export interface TrayStatus {
@@ -16,6 +17,8 @@ export interface TrayOptions {
   wsUrl: string;
   logFile: string | null;
   onQuit: () => void;
+  /** Backs the live log window; omit to disable it. */
+  logBuffer?: BufferedLogSink;
 }
 
 export interface TrayController {

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { ConsoleSink, FileSink, Logger, type LogSink } from '../src/logger.js';
+import { BufferedLogSink, ConsoleSink, FileSink, Logger, type LogSink } from '../src/logger.js';
 import type { LogLevel } from '../src/config.js';
 
 function tempDir(): string {
@@ -107,4 +107,47 @@ test('file sink never throws when the path is unusable', () => {
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('buffered sink keeps recent lines and caps at capacity', () => {
+  const sink = new BufferedLogSink(3);
+  for (let i = 1; i <= 5; i += 1) {
+    sink.write('info', `line ${i}`, new Date('2026-01-02T03:04:05.000Z'));
+  }
+  const lines = sink.snapshot();
+  assert.equal(lines.length, 3);
+  assert.match(lines[0]!, /line 3$/);
+  assert.match(lines[2]!, /line 5$/);
+  assert.match(lines[0]!, /^2026-01-02T03:04:05\.000Z \[INFO\] /);
+});
+
+test('buffered sink forwards new lines to a listener', () => {
+  const sink = new BufferedLogSink(10);
+  const seen: string[] = [];
+  sink.onLine((line) => seen.push(line));
+  sink.write('warn', 'live one', new Date());
+  sink.write('error', 'live two', new Date());
+  assert.equal(seen.length, 2);
+  assert.match(seen[0]!, /\[WARN\] live one$/);
+  assert.match(seen[1]!, /\[ERROR\] live two$/);
+});
+
+test('a throwing log listener cannot take the agent down', () => {
+  const sink = new BufferedLogSink(10);
+  sink.onLine(() => {
+    throw new Error('log window exploded');
+  });
+  assert.doesNotThrow(() => sink.write('info', 'still fine', new Date()));
+  assert.equal(sink.snapshot().length, 1, 'the line is still buffered');
+});
+
+test('detaching the listener stops delivery but keeps buffering', () => {
+  const sink = new BufferedLogSink(10);
+  const seen: string[] = [];
+  sink.onLine((line) => seen.push(line));
+  sink.write('info', 'before', new Date());
+  sink.onLine(null);
+  sink.write('info', 'after', new Date());
+  assert.equal(seen.length, 1);
+  assert.equal(sink.snapshot().length, 2);
 });

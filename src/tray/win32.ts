@@ -39,6 +39,36 @@ export const LR_LOADFROMFILE = 0x0010;
 
 export const PM_REMOVE = 1;
 
+// Log window
+export const WS_OVERLAPPEDWINDOW = 0x00cf0000;
+export const WS_CHILD = 0x40000000;
+export const WS_VISIBLE = 0x10000000;
+export const WS_VSCROLL = 0x00200000;
+export const WS_HSCROLL = 0x00100000;
+export const ES_MULTILINE = 0x0004;
+export const ES_READONLY = 0x0800;
+export const ES_AUTOVSCROLL = 0x0040;
+export const ES_AUTOHSCROLL = 0x0080;
+
+export const WM_CLOSE = 0x0010;
+export const WM_SIZE = 0x0005;
+export const WM_SETFONT = 0x0030;
+export const WM_SETREDRAW = 0x000b;
+export const WM_GETTEXTLENGTH = 0x000e;
+
+export const EM_SETSEL = 0x00b1;
+export const EM_REPLACESEL = 0x00c2;
+export const EM_SCROLLCARET = 0x00b7;
+export const EM_SETLIMITTEXT = 0x00c5;
+
+export const SW_HIDE = 0;
+export const SW_SHOW = 5;
+export const SW_RESTORE = 9;
+
+export const CW_USEDEFAULT = 0x80000000 | 0;
+
+export const FIXED_PITCH_MODERN = 0x31; // FIXED_PITCH | FF_MODERN
+
 export const SM_CXSMICON = 49;
 export const SM_CYSMICON = 50;
 
@@ -92,6 +122,16 @@ export interface Win32Api {
   GetCursorPos: Fn;
   SetForegroundWindow: Fn;
   Shell_NotifyIconW: Fn;
+
+  SendMessageW: Fn;
+  SendMessageTextW: Fn;
+  ShowWindow: Fn;
+  IsWindowVisible: Fn;
+  MoveWindow: Fn;
+  GetClientRect: Fn;
+  SetWindowTextW: Fn;
+  CreateFontW: Fn;
+  DeleteObject: Fn;
 }
 
 let cached: Win32Api | null = null;
@@ -102,6 +142,8 @@ export function loadWin32(): Win32Api {
   }
 
   const POINT = koffi.struct('POINT', { x: 'long', y: 'long' });
+
+  koffi.struct('RECT', { left: 'long', top: 'long', right: 'long', bottom: 'long' });
 
   // Registered by name; the function signatures below refer to it as "MSG *".
   koffi.struct('MSG', {
@@ -154,6 +196,7 @@ export function loadWin32(): Win32Api {
   const user32 = koffi.load('user32.dll');
   const shell32 = koffi.load('shell32.dll');
   const kernel32 = koffi.load('kernel32.dll');
+  const gdi32 = koffi.load('gdi32.dll');
 
   cached = {
     sizeofWndClass: koffi.sizeof(WNDCLASSEXW),
@@ -207,6 +250,30 @@ export function loadWin32(): Win32Api {
     Shell_NotifyIconW: shell32.func(
       'int __stdcall Shell_NotifyIconW(uint32_t msg, NOTIFYICONDATAW *data)',
     ),
+
+    SendMessageW: user32.func(
+      'intptr_t __stdcall SendMessageW(void *hwnd, uint32_t msg, uintptr_t wp, intptr_t lp)',
+    ),
+    // Same export, declared a second time with lParam typed as a string, for
+    // messages like EM_REPLACESEL. koffi has no prototype-level alias syntax,
+    // so this uses the name/return/args form.
+    SendMessageTextW: user32.func('SendMessageW', 'intptr_t', [
+      'void *',
+      'uint32_t',
+      'uintptr_t',
+      'const uint16_t *',
+    ]),
+    ShowWindow: user32.func('int __stdcall ShowWindow(void *hwnd, int cmd)'),
+    IsWindowVisible: user32.func('int __stdcall IsWindowVisible(void *hwnd)'),
+    MoveWindow: user32.func(
+      'int __stdcall MoveWindow(void *hwnd, int x, int y, int w, int h, int repaint)',
+    ),
+    GetClientRect: user32.func('int __stdcall GetClientRect(void *hwnd, _Out_ RECT *rect)'),
+    SetWindowTextW: user32.func('int __stdcall SetWindowTextW(void *hwnd, const uint16_t *text)'),
+    CreateFontW: gdi32.func(
+      'void *__stdcall CreateFontW(int h, int w, int esc, int orient, int weight, uint32_t italic, uint32_t underline, uint32_t strike, uint32_t charset, uint32_t outPrec, uint32_t clipPrec, uint32_t quality, uint32_t pitch, const uint16_t *face)',
+    ),
+    DeleteObject: gdi32.func('int __stdcall DeleteObject(void *obj)'),
   };
 
   return cached;

@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { dirname } from 'node:path';
 import type { Logger } from '../logger.js';
+import { LogWindow } from './LogWindow.js';
 import { promoteTrayIcon } from './promote.js';
 import { isReaderConnected, tooltip } from './status.js';
 import type { TrayController, TrayIcons, TrayOptions, TrayStatus } from './types.js';
@@ -44,6 +45,7 @@ const INFO_UNITS = 256;
 const INFO_TITLE_UNITS = 64;
 
 const ID_STATUS = 1;
+const ID_SHOW_LOG = 5;
 const ID_OPEN_LOGS = 2;
 const ID_COPY_URL = 3;
 const ID_QUIT = 4;
@@ -69,9 +71,11 @@ export class Win32TrayController implements TrayController {
   private pump: NodeJS.Timeout | null = null;
   private taskbarCreatedMessage = 0;
   private menuRequested = false;
+  private logRequested = false;
   private menuOpen = false;
   private iconAdded = false;
   private status: TrayStatus = { state: 'STARTING', reader: null };
+  private logWindow: LogWindow | null = null;
 
   constructor(options: TrayOptions, log: Logger, icons: TrayIcons) {
     this.options = options;
@@ -139,6 +143,10 @@ export class Win32TrayController implements TrayController {
       this.pump = null;
     }
     this.removeIcon();
+    if (this.logWindow) {
+      this.logWindow.destroy();
+      this.logWindow = null;
+    }
     const api = this.api;
     if (!api) {
       return;
@@ -228,10 +236,12 @@ export class Win32TrayController implements TrayController {
     }
     if (msg === TRAY_CALLBACK_MESSAGE) {
       const event = Number(lp);
-      if (event === WM_RBUTTONUP || event === WM_CONTEXTMENU || event === WM_LBUTTONUP) {
+      if (event === WM_RBUTTONUP || event === WM_CONTEXTMENU) {
         // Defer: TrackPopupMenu runs its own modal loop, which must not be
         // entered from inside a dispatch we are already nested in.
         this.menuRequested = true;
+      } else if (event === WM_LBUTTONUP) {
+        this.logRequested = true;
       }
       return 0;
     }
@@ -258,6 +268,10 @@ export class Win32TrayController implements TrayController {
       if (this.menuRequested && !this.menuOpen) {
         this.menuRequested = false;
         this.showMenu();
+      }
+      if (this.logRequested) {
+        this.logRequested = false;
+        this.toggleLogWindow();
       }
     } catch (err) {
       this.log.debug(`Tray message pump error: ${String(err)}`);
@@ -364,6 +378,7 @@ export class Win32TrayController implements TrayController {
       const label = tooltip(this.status).replace(/\n/g, ' - ');
       api.AppendMenuW(menu, MF_STRING | MF_GRAYED, ID_STATUS, wstr(label));
       api.AppendMenuW(menu, MF_SEPARATOR, 0, null);
+      api.AppendMenuW(menu, MF_STRING, ID_SHOW_LOG, wstr('Show log'));
       if (this.options.logFile) {
         api.AppendMenuW(menu, MF_STRING, ID_OPEN_LOGS, wstr('Open log folder'));
       }
@@ -407,6 +422,9 @@ export class Win32TrayController implements TrayController {
 
   private onMenuChoice(choice: number): void {
     switch (choice) {
+      case ID_SHOW_LOG:
+        this.toggleLogWindow();
+        break;
       case ID_OPEN_LOGS:
         this.openLogFolder();
         break;
@@ -446,6 +464,21 @@ export class Win32TrayController implements TrayController {
       child.stdin?.end(text, 'utf8');
     } catch (err) {
       this.log.debug(`Clipboard copy failed: ${String(err)}`);
+    }
+  }
+
+  private toggleLogWindow(): void {
+    const buffer = this.options.logBuffer;
+    if (!buffer) {
+      return;
+    }
+    try {
+      if (!this.logWindow) {
+        this.logWindow = new LogWindow(this.requireApi(), this.log, buffer);
+      }
+      this.logWindow.toggle();
+    } catch (err) {
+      this.log.warn(`Could not show the log window: ${String(err)}`);
     }
   }
 

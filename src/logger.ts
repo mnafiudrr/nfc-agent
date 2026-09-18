@@ -105,6 +105,46 @@ export class FileSink implements LogSink {
   close(): void {}
 }
 
+/**
+ * Keeps the most recent lines in memory and forwards new ones to a listener.
+ * Backs the tray's live log window: the buffer is what a newly opened window
+ * shows, and the listener is how it stays live afterwards.
+ */
+export class BufferedLogSink implements LogSink {
+  private readonly capacity: number;
+  private readonly lines: string[] = [];
+  private listener: ((line: string) => void) | null = null;
+
+  constructor(capacity = 500) {
+    this.capacity = Math.max(1, capacity);
+  }
+
+  write(level: LogLevel, message: string, timestamp: Date): void {
+    const line = `${timestamp.toISOString()} [${level.toUpperCase()}] ${message}`;
+    this.lines.push(line);
+    if (this.lines.length > this.capacity) {
+      this.lines.splice(0, this.lines.length - this.capacity);
+    }
+    try {
+      this.listener?.(line);
+    } catch {
+      // A failing log viewer must never take the agent down.
+    }
+  }
+
+  snapshot(): string[] {
+    return [...this.lines];
+  }
+
+  onLine(listener: ((line: string) => void) | null): void {
+    this.listener = listener;
+  }
+
+  close(): void {
+    this.listener = null;
+  }
+}
+
 export class Logger {
   private readonly level: LogLevel;
   private readonly sinks: readonly LogSink[];
