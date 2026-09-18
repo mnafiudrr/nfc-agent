@@ -128,52 +128,6 @@ function Get-Python3 {
 #
 # Layout: DOS header e_lfanew at 0x3C -> PE signature (4) -> COFF header (20)
 # -> optional header, where Subsystem sits at offset 68 in both PE32 and PE32+.
-# Stamps the exe's icon and version resources. pkg has no --icon option, so
-# this uses rcedit (devDependency) to rewrite the PE resource section.
-function Set-ExeIcon {
-    param(
-        [Parameter(Mandatory)][string]$Path,
-        [Parameter(Mandatory)][string]$IconPath
-    )
-
-    if (-not (Test-Path -LiteralPath $IconPath)) {
-        Write-Warn2 "$IconPath not found - leaving the default pkg icon in place."
-        return
-    }
-
-    $rcedit = 'node_modules\rcedit\bin\rcedit-x64.exe'
-    if (-not (Test-Path -LiteralPath $rcedit)) {
-        Write-Warn2 'rcedit is not installed - run "npm install" to set the executable icon.'
-        return
-    }
-
-    $resolvedIcon = (Resolve-Path -LiteralPath $IconPath).Path
-    $resolvedExe = (Resolve-Path -LiteralPath $Path).Path
-
-    # rcedit calls EndUpdateResource, which fails with "Unable to commit
-    # changes" while something still holds the file pkg has just written -
-    # typically an antivirus scan. Retrying a second later clears it.
-    $code = 1
-    $rceditOutput = @()
-    foreach ($attempt in 1..4) {
-        $prevEap = $ErrorActionPreference
-        $ErrorActionPreference = 'Continue'
-        $rceditOutput = & $rcedit $resolvedExe '--set-icon' $resolvedIcon 2>&1
-        $code = $LASTEXITCODE
-        $ErrorActionPreference = $prevEap
-
-        if ($code -eq 0) { break }
-        if ($attempt -lt 4) { Start-Sleep -Milliseconds 1200 }
-    }
-
-    if ($code -ne 0) {
-        Write-Warn2 "rcedit exited with $code - the executable keeps the default icon."
-        foreach ($line in @($rceditOutput)) { Write-Warn2 "  $line" }
-        return
-    }
-    Write-Ok "Icon set from $IconPath"
-}
-
 function Set-PeSubsystemGui {
     param([Parameter(Mandatory)][string]$Path)
 
@@ -404,17 +358,14 @@ if (-not (Test-Path $Output)) { Fail "pkg reported success but $Output does not 
 $exeSize = [math]::Round((Get-Item $Output).Length / 1MB, 1)
 Write-Ok "$Output ($exeSize MB)"
 
-# --- 5c. brand the executable ---------------------------------------------
-
-Write-Step 'Setting the executable icon'
-
-Set-ExeIcon -Path $Output -IconPath 'assets\asliv.ico'
-
-# --- 5d. make the exe windowless ------------------------------------------
+# --- 5c. make the exe windowless ------------------------------------------
 
 Write-Step 'Switching the executable to the Windows GUI subsystem'
 
-# Runs after rcedit: rewriting resources would otherwise discard the patch.
+# Safe here because this flips two bytes in the PE header without moving any
+# section, so pkg's appended payload stays at the offset pkg recorded. Editing
+# PE *resources* - to set a custom icon, say - does move sections and silently
+# breaks the exe; see docs/plans/windows-tray.md.
 Set-PeSubsystemGui -Path $Output
 
 # --- 6. smoke test ---------------------------------------------------------
