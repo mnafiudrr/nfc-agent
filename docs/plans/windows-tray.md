@@ -88,9 +88,11 @@ Between Half A and Half B the only way to stop the agent is Task Manager. That i
 
 ### 5.1 Scope
 
-- Icon in the notification area, tooltip carrying the current `ReaderState`.
-- Left-click → status balloon; right-click → menu.
-- Menu: **Status** (reader name / state, disabled label) · **Open log folder** · **Copy WebSocket URL** · **Start with Windows** (checkbox) · **Quit**.
+- Icon in the notification area, using `assets/asliv.ico`, with a green dot badge when a reader is attached and a red one when none is (§5.5).
+- Tooltip carrying the current `ReaderState`.
+- **Left-click → the live log window** (§5.6); right-click → menu.
+- Menu: **Status** (reader name / state, disabled label) · **Show log** · **Open log folder** · **Copy WebSocket URL** · **Quit**.
+- Desktop notifications on plug and unplug (§5.7).
 - **Quit** calls the existing `shutdown()` in `index.ts`; no new teardown path.
 
 ### 5.2 Options
@@ -115,6 +117,50 @@ Either choice sits outside the allowed list in `dependency-policy.md` §2, so §
 - Add koffi's prebuilt binary (`node_modules/@koromix/koffi-win32-x64/win32_x64/koffi.node`) to `pkg.assets`. koffi resolves it through a computed path that pkg's static analysis cannot see.
 - Pump messages from a `setInterval` (~50 ms), not a blocking `GetMessage` loop, so libuv keeps running.
 - Tear the icon down on exit. An orphaned tray icon that lingers until the user hovers over it is a common and very visible bug.
+
+### 5.5 Making the icon visible, and the status badge
+
+Windows 11 parks **every** newly registered tray icon in the hidden overflow flyout behind the `^` chevron. The icon is registered correctly and simply never shown, which reads to a user as "the agent did not start". Explorer records each icon under:
+
+```
+HKCU\Control Panel\NotifyIconSettings\<id>
+    ExecutablePath : ...\acr122u-agent.exe
+    IsPromoted     : 1 = pinned to the taskbar
+```
+
+The agent sets `IsPromoted` itself on start, finding the subkey whose `ExecutablePath` matches `process.execPath`. Explorer only writes the key after it has seen the icon, so the lookup retries at 0.8 s, 2 s and 5 s. The value is written only when absent or `0`, so a user who deliberately drags the icon back into the overflow is not overridden on the next start.
+
+The badge is derived at runtime from `assets/asliv.ico`: `src/tray/badge.ts` decodes the uncompressed 32bpp icon, composites an antialiased dot in the bottom-right, and re-encodes two variants. Swapping the brand icon restyles the tray with no build step. A PNG-compressed source cannot be decoded, in which case the tray falls back to the unbadged icon and logs a warning.
+
+### 5.6 The live log window
+
+Left-clicking the icon opens a plain Win32 window wrapping a read-only multiline `EDIT` control in Consolas. `WM_CLOSE` **hides** the window rather than destroying it, so closing the log never stops the agent.
+
+`BufferedLogSink` keeps the last 500 lines and is installed before the tray exists, so a window opened later still shows the startup lines. The control is rebuilt from that capped buffer every 400 appends, bounding memory on a long-running agent.
+
+Two traps worth remembering:
+
+- `EM_SETSEL(-1, -1)` does **not** move the caret to the end of an `EDIT` control — it collapses the selection at the start, so appends land at the top and the log reads backwards. Query `WM_GETTEXTLENGTH` and select `(len, len)` instead.
+- Without `ES_AUTOHSCROLL` the horizontal scrollbar is inert and long lines wrap.
+
+### 5.7 Notifications
+
+`Shell_NotifyIcon` with `NIF_INFO` shows "Device is plugged" / "Device is unplugged", surfaced as toasts on Windows 10 and 11. They hang off the existing `readerConnected` / `readerDisconnected` events, so they cannot disagree with the badge. A reader already attached at launch counts as a connect, so the agent notifies shortly after start.
+
+### 5.8 The executable icon is not achievable with pkg
+
+Setting a custom icon on the packaged `.exe` was attempted and abandoned. pkg appends its virtual filesystem as an overlay after the last PE section and bakes that absolute offset into the binary. Any tool that edits PE **resources** rewrites the section table:
+
+| Attempt                                         | Result                                                                                                                   |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `rcedit --set-icon` on the packaged exe         | `EndUpdateResource` drops the overlay — 1,987,862 bytes of payload. Exe fails with `Pkg: Error reading from file.`       |
+| Re-appending the saved overlay afterwards       | Payload returns, but the resource section grew ~3 KB, so the baked offset now points into it. Dies on a garbled prelude. |
+| Stamping the icon onto pkg's cached base binary | pkg re-fetches the base when it has been modified.                                                                       |
+| Renaming the modified base to `built-`          | pkg used the fetched copy anyway.                                                                                        |
+
+The subsystem patch (§4.1) is safe for the opposite reason: it flips two bytes in the PE header and moves nothing.
+
+The tray icon — what users actually see while the agent runs — is the brand icon. Only the file icon in Explorer stays Node's hexagon. Changing that needs a different packager, or the `-Fallback` bundled-runtime layout, where `node.exe` is a plain copy with no overlay and can be stamped safely.
 
 ## 6. Architecture fit
 
@@ -142,12 +188,13 @@ Either choice sits outside the allowed list in `dependency-policy.md` §2, so §
 
 ## 9. Phasing
 
-| Phase | Work                                                     | Status                                                       |
-| ----- | -------------------------------------------------------- | ------------------------------------------------------------ |
-| 0     | Spike the tray mechanism (§5.3) on a throwaway branch    | **Done** — koffi confirmed; struct sizes match x64 exactly   |
-| 1     | Subsystem patch · file sink · single-instance guard      | **Done** — [task 008](../tasks/008-headless-windows-mode.md) |
-| 2     | Tray icon, menu, Quit, status tooltip                    | **Done** — [task 009](../tasks/009-windows-system-tray.md)   |
-| 3     | Start with Windows · balloon notifications · status icon | Not started                                                  |
+| Phase | Work                                                          | Status                                                       |
+| ----- | ------------------------------------------------------------- | ------------------------------------------------------------ |
+| 0     | Spike the tray mechanism (§5.3) on a throwaway branch         | **Done** — koffi confirmed; struct sizes match x64 exactly   |
+| 1     | Subsystem patch · file sink · single-instance guard           | **Done** — [task 008](../tasks/008-headless-windows-mode.md) |
+| 2     | Tray icon, menu, Quit, status tooltip                         | **Done** — [task 009](../tasks/009-windows-system-tray.md)   |
+| 3     | Brand icon · taskbar pin · status badge · toasts · log window | **Done** — §5.5–§5.7                                         |
+| 4     | Start with Windows toggle                                     | Not started                                                  |
 
 Phases 1 and 2 are verified from the packaged exe. What remains is the manual pass in
 [../tasks/007-manual-hardware-testing.md](../tasks/007-manual-hardware-testing.md) tests 11–19: the icon

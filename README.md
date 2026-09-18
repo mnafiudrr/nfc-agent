@@ -71,11 +71,23 @@ Node.js is **not** required. Do this in order — most machines need no driver i
    normalized UID.
 
 The agent runs **in the system tray, with no console window** — there is no terminal to close by accident.
-Right-click the tray icon for the current reader status, **Open log folder**, **Copy WebSocket URL**, and
-**Quit**. Quitting from that menu is the intended way to stop it.
 
-> On Windows 11 a new tray icon starts in the hidden overflow area. Click the `^` next to the clock and drag
-> the icon onto the taskbar to keep it visible.
+| Action                   | What happens                                                                          |
+| ------------------------ | ------------------------------------------------------------------------------------- |
+| Tray icon badge          | **Green dot** when the reader is attached, **red dot** when it is not                 |
+| Reader plugged/unplugged | A notification: _Device is plugged_ / _Device is unplugged_                           |
+| **Left-click** the icon  | Opens a live log window. Closing that window does **not** stop the agent              |
+| **Right-click** the icon | Menu: status · **Show log** · **Open log folder** · **Copy WebSocket URL** · **Quit** |
+
+Quitting from the tray menu is the intended way to stop the agent.
+
+> The agent pins its own icon to the taskbar on first run. Windows 11 otherwise hides every new tray icon
+> behind the `^` chevron, which looks like the agent failed to start. If you drag the icon back into the
+> overflow, it stays there — the agent will not re-pin it.
+
+> The **file** icon in Explorer is still Node's hexagon, not the brand mark. pkg bakes the offset of its
+> bundled payload into the executable, so editing the icon afterwards corrupts it; see
+> [docs/plans/windows-tray.md §5.8](docs/plans/windows-tray.md). The tray icon is the brand mark.
 
 Because there is no console, logs go to a file instead:
 

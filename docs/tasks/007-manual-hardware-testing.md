@@ -52,9 +52,10 @@ unit-tested. Run them against `dist\bin\win-x64\acr122u-agent.exe`, not `node di
 Double-click the exe.
 Expected: no terminal window appears, not even a flash. The agent is running (check the tray, or the log file).
 
-**Test 12 — Tray icon present**
-Expected: the blue NFC icon appears in the notification area. On Windows 11 new icons start in the hidden
-overflow ("^"), so expand it; drag it onto the taskbar to keep it visible.
+**Test 12 — Tray icon present and pinned**
+Expected: the asri living icon appears **on the taskbar**, not only in the hidden overflow. The agent pins
+itself by setting `IsPromoted` under `HKCU\Control Panel\NotifyIconSettings`; the log records
+`Pinned the tray icon to the taskbar`. Drag it into the overflow and restart: it must stay there.
 
 **Test 13 — Tooltip tracks reader state**
 Hover the icon with no reader, then plug the reader in, then hold a card on it.
@@ -90,26 +91,56 @@ here is expected; anything longer than the menu being open is a bug.
 Run with `LOG_LEVEL=debug` long enough to pass 5 MB, or set a small limit temporarily.
 Expected: `agent.log`, `agent.log.1`, `agent.log.2` exist and no more than three files are kept.
 
+**Test 20 — Status badge**
+Start with no reader, then plug it in, then unplug it.
+Expected: the tray icon carries a **red** dot with no reader and a **green** dot once one is attached, and
+it switches within a second or two of each change.
+
+**Test 21 — Plug/unplug notifications**
+Expected: plugging the reader shows _Device is plugged_; unplugging shows _Device is unplugged_.
+Note a reader already attached at launch counts as a connect, so one appears shortly after start.
+
+**Test 22 — Live log window**
+Left-click the tray icon.
+Expected: a window opens showing recent log lines **oldest first**, in a monospace font. Tap a card and the
+new lines appear at the **bottom** in real time. Long lines scroll horizontally rather than wrapping.
+
+**Test 23 — Closing the log does not exit the agent**
+Close the log window with its X.
+Expected: the window disappears, the tray icon stays, the agent keeps serving `127.0.0.1:8765`, and
+left-clicking the icon reopens the window with its history intact.
+
+**Test 24 — Agent starts with no reader attached**
+Unplug the reader, then start the agent from cold.
+Expected: it starts, logs `No PC/SC reader detected yet. Waiting for one to be plugged in...`, shows a red
+badge, and **stays responsive** — a WebSocket client can still connect. Plugging the reader in then brings
+it to green without a restart. (Before this was fixed, the agent froze completely in this state.)
+
 ## Checklist
 
-| Test | Expected                       | Observed | Pass |
-| ---- | ------------------------------ | -------- | ---- |
-| 1    | Stays alive, no reader         |          |      |
-| 2    | Reader connected               |          |      |
-| 3    | Card detected + UID            |          |      |
-| 4    | One event, no spam             |          |      |
-| 5    | Card removed                   |          |      |
-| 6    | Card detected again            |          |      |
-| 7    | Reader disconnected, alive     |          |      |
-| 8    | Reader connected, no restart   |          |      |
-| 9    | Agent continues running        |          |      |
-| 10   | Both clients get event         |          |      |
-| 11   | No console window at all       |          |      |
-| 12   | Tray icon visible              |          |      |
-| 13   | Tooltip tracks state           |          |      |
-| 14   | Menu actions work              |          |      |
-| 15   | Quit is graceful, icon gone    |          |      |
-| 16   | Second launch is a no-op       |          |      |
-| 17   | Icon survives Explorer restart |          |      |
-| 18   | No lasting stall from the menu |          |      |
-| 19   | Log rotates, keeps three files |          |      |
+| Test | Expected                              | Observed | Pass |
+| ---- | ------------------------------------- | -------- | ---- |
+| 1    | Stays alive, no reader                |          |      |
+| 2    | Reader connected                      |          |      |
+| 3    | Card detected + UID                   |          |      |
+| 4    | One event, no spam                    |          |      |
+| 5    | Card removed                          |          |      |
+| 6    | Card detected again                   |          |      |
+| 7    | Reader disconnected, alive            |          |      |
+| 8    | Reader connected, no restart          |          |      |
+| 9    | Agent continues running               |          |      |
+| 10   | Both clients get event                |          |      |
+| 11   | No console window at all              |          |      |
+| 12   | Tray icon visible                     |          |      |
+| 13   | Tooltip tracks state                  |          |      |
+| 14   | Menu actions work                     |          |      |
+| 15   | Quit is graceful, icon gone           |          |      |
+| 16   | Second launch is a no-op              |          |      |
+| 17   | Icon survives Explorer restart        |          |      |
+| 18   | No lasting stall from the menu        |          |      |
+| 19   | Log rotates, keeps three files        |          |      |
+| 20   | Badge red/green tracks reader         |          |      |
+| 21   | Plug/unplug notifications             |          |      |
+| 22   | Live log window, newest last          |          |      |
+| 23   | Closing log keeps agent alive         |          |      |
+| 24   | Starts and stays alive with no reader |          |      |
