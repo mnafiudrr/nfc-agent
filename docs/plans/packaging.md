@@ -18,7 +18,7 @@ Packaging must still work against the physical ACR122U through PC/SC, which is t
 | ---- | ----- | ------- |
 | Node.js + npm | dev machine | install deps, run `npm run build` (TS → `dist/`) |
 | A bundler/compiler | dev machine | produce single-binary executables |
-| PC/SC driver/lib | on the **target** machine | `pcsc-lite` (macOS) / ACS Windows driver + Smart Card service |
+| PC/SC driver/lib | on the **target** machine | `pcsc-lite` (macOS) / on Windows `WinSCard.dll` + `SCardSvr` are built in, and the reader usually binds to the inbox CCID driver — ACS driver only as fallback |
 
 ## 3. Packaging strategies
 
@@ -109,7 +109,7 @@ REM 3. wrap in an installer (Inno Setup / WiX / NSIS) if desired
 
 - `nfc-pcsc` → `@pokusew/pcsclite` is a `node-gyp` native addon.
 - It must match the **target** OS + architecture, and must link against PC/SC on the target machine.
-- On macOS the target needs `pcsc-lite` (or the built-in `pcscd`). On Windows the target needs the ACS driver + Smart Card service.
+- On macOS the target needs `pcsc-lite` (or the built-in `pcscd`). On Windows the addon imports `WinSCard.dll` and the `SCardSvr` service, both part of the OS — the only target-side requirement is that the reader enumerates under **Smart card readers**, usually via the inbox CCID driver, otherwise via the ACS driver.
 - When cross-compiling, build on the same OS/arch as the target, or fetch the correct prebuilt addon.
 - **Always verify** with the manual hardware checklist after packaging.
 

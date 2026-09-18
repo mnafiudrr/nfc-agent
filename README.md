@@ -19,7 +19,8 @@ For contributors working on the source.
 ### Prerequisites
 
 - Node.js 18+ and npm
-- PC/SC daemon installed (built-in `pcscd` on macOS; ACS driver + Smart Card service on Windows)
+- A working PC/SC stack (built-in `pcscd` on macOS; on Windows the Smart Card service is built in, and the
+  reader usually binds to the inbox CCID driver — install the ACS driver only if it does not)
 - ACR122U-A9 reader (or any PC/SC reader matching an ACR122U pattern)
 
 ### Setup & run
@@ -55,30 +56,65 @@ For end users running the agent without Node.js.
 
 ### Option A — Install the prebuilt executable (recommended)
 
-1. Install the **ACS ACR122U driver** on the Windows machine (Node.js is **not** required).
-2. Plug in the reader; verify it appears under **Device Manager → Smart card readers → `ACS ACR122U PICC Interface`**.
-3. Run `acr122u-agent.exe` — it binds to `ws://127.0.0.1:8765` and emits `card_detected` events with the normalized UID.
+Node.js is **not** required. Do this in order — most machines need no driver install at all:
+
+1. **Plug in the reader first.**
+2. Check **Device Manager → Smart card readers**.
+   - `ACS ACR122U PICC Interface` is listed → **you are done, skip to step 4.** Windows 10/11 ship an
+     inbox CCID driver (`Microsoft Usbccid Smartcard Reader (WUDF)`) and the ACR122U is a CCID device,
+     so it usually enumerates on its own.
+   - The reader shows under **Other devices**, as an unknown device, or not at all → continue to step 3.
+3. Install the official **ACS ACR122U driver**, then re-check Device Manager. This is typically needed
+   only where Windows Update driver search is disabled by policy, or on offline machines.
+4. Run `acr122u-agent.exe` — it binds to `ws://127.0.0.1:8765` and emits `card_detected` events with the
+   normalized UID.
+
+You do **not** need to start or enable the Windows **Smart Card** service (`SCardSvr`). It is part of
+Windows and is trigger-started on smart-card-reader device arrival, so seeing it `Stopped` before the
+reader is plugged in is normal.
+
+> Deploying to many machines? Shipping the ACS driver installer alongside the exe and running it
+> unconditionally is harmless when the inbox driver already works, and removes the step-2 branch from
+> your support burden.
 
 ### Option B — Build the exe yourself (Windows x64/amd64)
 
-Full step-by-step guide: [docs/plans/windows-exe.md](docs/plans/windows-exe.md).
-
-Quick summary — build on a Windows machine with Node.js + VS Build Tools:
+On a Windows x64 machine with **Node.js LTS**, **VS Build Tools** (Desktop development with C++) and
+**Python 3** installed, from the repo root:
 
 ```powershell
-npm ci
-npm run build
-
-# add the "pkg" config block to package.json (see docs/plans/windows-exe.md §4.3)
-npx @yao-pkg/pkg . --output dist\bin\win-x64\acr122u-agent.exe
+npm run build:exe
 ```
+
+That runs [`scripts/build-win-exe.ps1`](scripts/build-win-exe.ps1), which installs dependencies, verifies the native `pcsclite` addon, compiles TypeScript, and packages the exe with a `pkg` target matched to your local Node major version.
+
+Python 3 is required because `@pokusew/pcsclite` has no prebuilt binaries and compiles via `node-gyp`.
+Install it with `winget install --id Python.Python.3.12 -e --scope user`. Note that the `python.exe`
+Windows puts on `PATH` at `%LOCALAPPDATA%\Microsoft\WindowsApps` is a 0-byte Microsoft Store
+placeholder, not an interpreter - node-gyp fails with `find Python ... version is ""` if that is all it finds.
 
 Output: `dist\bin\win-x64\acr122u-agent.exe` — a single self-contained 64-bit executable.
 
+Useful switches:
+
+```powershell
+# skip npm ci when node_modules is already built by the same Node major
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-win-exe.ps1 -SkipInstall
+
+# ship node.exe + app + run.bat instead of a single exe (never hits pkg/ABI issues)
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-win-exe.ps1 -Fallback
+```
+
+Full background, CI recipe, and troubleshooting: [docs/plans/windows-exe.md](docs/plans/windows-exe.md).
+
 > Notes:
-> - The exe must be built **on Windows** because `@pokusew/pcsclite` is a native addon compiled per OS/arch + Node ABI.
+>
+> - The exe must be built **on Windows** because `@pokusew/pcsclite` is a native addon compiled per OS/arch + Node ABI. macOS and Linux cannot produce it.
 > - **Bun is not used** — the project runs on Node/npm, and Bun's runtime cannot load the non-N-API pcsclite addon.
-> - The **ACR122U driver is still required** on any machine that runs the exe; only Node.js is removed.
+> - Only Node.js is removed. The exe still needs the reader to appear as a PC/SC device on the target
+>   machine — often satisfied by the Windows inbox CCID driver, otherwise by the ACS driver (see Option A).
+>   The `WinSCard.dll` API the addon imports and the `SCardSvr` service are both part of Windows, and a
+>   USB driver cannot be bundled into a `pkg` executable.
 
 ### Verify after install
 
