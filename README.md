@@ -34,11 +34,12 @@ npm run dev                  # watch mode (tsx)
 
 Configuration via environment variables (sensible defaults):
 
-| Env         | Default     | Description                            |
-| ----------- | ----------- | -------------------------------------- |
-| `WS_HOST`   | `127.0.0.1` | WebSocket bind host (loopback only)    |
-| `WS_PORT`   | `8765`      | WebSocket port                         |
-| `LOG_LEVEL` | `info`      | `debug` \| `info` \| `warn` \| `error` |
+| Env         | Default     | Description                                |
+| ----------- | ----------- | ------------------------------------------ |
+| `WS_HOST`   | `127.0.0.1` | WebSocket bind host (loopback only)        |
+| `WS_PORT`   | `8765`      | WebSocket port                             |
+| `LOG_LEVEL` | `info`      | `debug` \| `info` \| `warn` \| `error`     |
+| `LOG_FILE`  | per-OS path | Log file path; empty disables file logging |
 
 ### Quality commands
 
@@ -68,6 +69,24 @@ Node.js is **not** required. Do this in order — most machines need no driver i
    only where Windows Update driver search is disabled by policy, or on offline machines.
 4. Run `acr122u-agent.exe` — it binds to `ws://127.0.0.1:8765` and emits `card_detected` events with the
    normalized UID.
+
+The agent runs **in the system tray, with no console window** — there is no terminal to close by accident.
+Right-click the tray icon for the current reader status, **Open log folder**, **Copy WebSocket URL**, and
+**Quit**. Quitting from that menu is the intended way to stop it.
+
+> On Windows 11 a new tray icon starts in the hidden overflow area. Click the `^` next to the clock and drag
+> the icon onto the taskbar to keep it visible.
+
+Because there is no console, logs go to a file instead:
+
+| Platform | Log file                                      |
+| -------- | --------------------------------------------- |
+| Windows  | `%LOCALAPPDATA%\acr122u-agent\logs\agent.log` |
+| macOS    | `~/Library/Logs/acr122u-agent/agent.log`      |
+
+Logs rotate at 5 MB and keep three files. Set `LOG_FILE` to write elsewhere, or to an empty value to turn
+file logging off. Launching the exe a second time is a no-op: it logs `Agent already running` and exits,
+leaving the first instance untouched.
 
 You do **not** need to start or enable the Windows **Smart Card** service (`SCardSvr`). It is part of
 Windows and is trigger-started on smart-card-reader device arrival, so seeing it `Stopped` before the

@@ -5,6 +5,7 @@
 .DESCRIPTION
     Runs the full pipeline described in docs/plans/windows-exe.md:
       npm ci  ->  verify the native pcsclite addon  ->  tsc  ->  @yao-pkg/pkg
+      ->  patch the PE subsystem so the exe runs with no console window
 
     The pkg target is derived from the locally installed Node major version so
     the bundled runtime ABI always matches the pcsclite addon that npm ci just
@@ -118,6 +119,54 @@ function Get-Python3 {
     }
 
     return $null
+}
+
+# Flip the PE "Subsystem" field from 3 (CUI/console) to 2 (GUI/windows) so the
+# Windows loader never allocates a console for the agent. Without this the exe
+# opens a terminal whose close button kills the agent - see
+# docs/plans/windows-tray.md section 4.1.
+#
+# Layout: DOS header e_lfanew at 0x3C -> PE signature (4) -> COFF header (20)
+# -> optional header, where Subsystem sits at offset 68 in both PE32 and PE32+.
+function Set-PeSubsystemGui {
+    param([Parameter(Mandatory)][string]$Path)
+
+    $resolved = (Resolve-Path -LiteralPath $Path).Path
+    $bytes = [System.IO.File]::ReadAllBytes($resolved)
+
+    if ($bytes.Length -lt 0x40) { Fail "$Path is too small to be a PE image." }
+
+    $peOff = [BitConverter]::ToInt32($bytes, 0x3C)
+    if ($peOff -le 0 -or ($peOff + 92) -ge $bytes.Length) {
+        Fail "$Path has an out-of-range PE header offset (e_lfanew = $peOff)."
+    }
+    if ([BitConverter]::ToUInt32($bytes, $peOff) -ne 0x00004550) {
+        Fail "$Path is not a PE image (missing PE signature at 0x$($peOff.ToString('X')))."
+    }
+
+    $subOff = $peOff + 92
+    $current = [BitConverter]::ToUInt16($bytes, $subOff)
+
+    if ($current -eq 2) {
+        Write-Ok 'Already GUI subsystem - no console window.'
+        return
+    }
+    if ($current -ne 3) {
+        # Anything else means the layout assumption is wrong; patching blind
+        # would corrupt the exe.
+        Fail "Unexpected PE subsystem value $current in $Path (expected 3 = console)." @(
+            'The pkg base binary layout may have changed. Verify before patching.'
+        )
+    }
+
+    $bytes[$subOff] = 2
+    $bytes[$subOff + 1] = 0
+    [System.IO.File]::WriteAllBytes($resolved, $bytes)
+
+    $verify = [BitConverter]::ToUInt16([System.IO.File]::ReadAllBytes($resolved), $subOff)
+    if ($verify -ne 2) { Fail "Failed to set the GUI subsystem on $Path." }
+
+    Write-Ok "Subsystem 3 -> 2 at offset 0x$($subOff.ToString('X')) - the exe runs with no console."
 }
 
 # --- 0. context ------------------------------------------------------------
@@ -309,33 +358,57 @@ if (-not (Test-Path $Output)) { Fail "pkg reported success but $Output does not 
 $exeSize = [math]::Round((Get-Item $Output).Length / 1MB, 1)
 Write-Ok "$Output ($exeSize MB)"
 
+# --- 5c. make the exe windowless ------------------------------------------
+
+Write-Step 'Switching the executable to the Windows GUI subsystem'
+
+Set-PeSubsystemGui -Path $Output
+
 # --- 6. smoke test ---------------------------------------------------------
 
 if (-not $NoSmokeTest) {
     Write-Step 'Smoke testing the executable (6 seconds)'
 
-    $logFile = Join-Path $env:TEMP "acr122u-agent-smoke-$PID.log"
-    $proc = Start-Process -FilePath (Resolve-Path $Output) -PassThru -NoNewWindow `
-        -RedirectStandardOutput $logFile -RedirectStandardError "$logFile.err"
+    # The exe is now a GUI-subsystem app with no stdout to capture, so the
+    # smoke test drives it through LOG_FILE - which also exercises the file
+    # sink end to end.
+    $smokeLog = Join-Path $env:TEMP "acr122u-agent-smoke-$PID.log"
+    if (Test-Path $smokeLog) { Remove-Item -Force $smokeLog }
+
+    $prevLogFile = $env:LOG_FILE
+    $env:LOG_FILE = $smokeLog
+    try {
+        $proc = Start-Process -FilePath (Resolve-Path $Output) -PassThru
+    }
+    finally {
+        if ($null -eq $prevLogFile) { Remove-Item Env:\LOG_FILE -ErrorAction SilentlyContinue }
+        else { $env:LOG_FILE = $prevLogFile }
+    }
 
     Start-Sleep -Seconds 6
+
+    if ($proc.MainWindowHandle -ne 0) {
+        Write-Warn2 "The exe opened a window (handle $($proc.MainWindowHandle)) - the subsystem patch did not take effect."
+    }
+    else {
+        Write-Ok 'No console window was created.'
+    }
+
     if (-not $proc.HasExited) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue }
     Start-Sleep -Milliseconds 500
 
     $out = @()
-    foreach ($f in @($logFile, "$logFile.err")) {
-        if (Test-Path $f) { $out += Get-Content $f -ErrorAction SilentlyContinue }
-    }
-    Remove-Item -Force $logFile, "$logFile.err" -ErrorAction SilentlyContinue
+    if (Test-Path $smokeLog) { $out = @(Get-Content $smokeLog -ErrorAction SilentlyContinue) }
+    Remove-Item -Force $smokeLog -ErrorAction SilentlyContinue
 
     if ($out.Count -gt 0) {
-        Write-Host '    --- output ---' -ForegroundColor DarkGray
+        Write-Host '    --- agent.log ---' -ForegroundColor DarkGray
         $out | Select-Object -First 20 | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
     }
 
     $joined = $out -join "`n"
     if ($joined -match 'Agent started') {
-        Write-Ok 'Executable starts and logs "Agent started".'
+        Write-Ok 'Executable starts and logs "Agent started" to the log file.'
     }
     elseif ($joined -match 'did not self-register|not a valid Win32 application|dlopen') {
         Write-Warn2 'The native addon failed to load - ABI or architecture mismatch.'
@@ -344,8 +417,11 @@ if (-not $NoSmokeTest) {
     elseif ($joined -match 'EADDRINUSE') {
         Write-Warn2 'Port 8765 is already in use - another agent instance is probably running. The exe itself is fine.'
     }
+    elseif ($joined -match 'Agent already running') {
+        Write-Warn2 'Another agent instance is already running. The exe itself is fine.'
+    }
     else {
-        Write-Warn2 'No "Agent started" line captured. Run the exe manually to check.'
+        Write-Warn2 'No "Agent started" line captured. Run the exe manually with LOG_FILE set to check.'
     }
 }
 
