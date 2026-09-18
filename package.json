@@ -15,14 +15,13 @@
     "dev": "tsx watch src/index.ts",
     "test": "tsx --test \"test/**/*.test.ts\"",
     "lint": "eslint .",
-    "format": "prettier --write .",
-    "build:icon": "node scripts/make-tray-icon.mjs"
+    "format": "prettier --write ."
   },
   "pkg": {
     "assets": [
       "node_modules/@pokusew/pcsclite/build/Release/pcsclite.node",
       "node_modules/@koromix/koffi-win32-x64/win32_x64/koffi.node",
-      "assets/tray.ico"
+      "assets/asliv.ico"
     ],
     "targets": [
       "node24-win-x64"
@@ -39,6 +38,7 @@
     "@types/ws": "^8.5.13",
     "eslint": "^9.17.0",
     "prettier": "^3.4.2",
+    "rcedit": "^5.0.2",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.18.1"

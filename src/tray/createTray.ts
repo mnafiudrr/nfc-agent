@@ -6,7 +6,7 @@ import { NoopTrayController } from './NoopTrayController.js';
 import type { TrayController, TrayOptions } from './types.js';
 import { Win32TrayController } from './Win32TrayController.js';
 
-const ICON_FILE = 'tray.ico';
+const ICON_FILE = 'asliv.ico';
 
 /**
  * LoadImageW needs a real filesystem path, and inside a pkg executable the
