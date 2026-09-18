@@ -22,6 +22,11 @@ export function statusLabel({ state, reader }: TrayStatus): string {
   }
 }
 
+/** Drives the tray badge: is a reader currently attached? */
+export function isReaderConnected({ state }: TrayStatus): boolean {
+  return state === 'READER_CONNECTED' || state === 'WAITING_FOR_CARD' || state === 'CARD_PRESENT';
+}
+
 export function tooltip(status: TrayStatus): string {
   const text = `${APP_NAME}\n${statusLabel(status)}`;
   return text.length <= MAX_TOOLTIP_LENGTH ? text : `${text.slice(0, MAX_TOOLTIP_LENGTH - 3)}...`;

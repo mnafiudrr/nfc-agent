@@ -5,6 +5,13 @@ export interface TrayStatus {
   reader: ReaderInfo | null;
 }
 
+export interface TrayIcons {
+  /** Unbadged brand icon; used when the badged variants cannot be built. */
+  base: string | null;
+  connected: string | null;
+  disconnected: string | null;
+}
+
 export interface TrayOptions {
   wsUrl: string;
   logFile: string | null;

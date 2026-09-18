@@ -2,8 +2,8 @@ import { spawn } from 'node:child_process';
 import { dirname } from 'node:path';
 import type { Logger } from '../logger.js';
 import { promoteTrayIcon } from './promote.js';
-import { tooltip } from './status.js';
-import type { TrayController, TrayOptions, TrayStatus } from './types.js';
+import { isReaderConnected, tooltip } from './status.js';
+import type { TrayController, TrayIcons, TrayOptions, TrayStatus } from './types.js';
 import {
   IMAGE_ICON,
   LR_LOADFROMFILE,
@@ -47,7 +47,7 @@ const ID_QUIT = 4;
 export class Win32TrayController implements TrayController {
   private readonly log: Logger;
   private readonly options: TrayOptions;
-  private readonly iconPath: string | null;
+  private readonly icons: TrayIcons;
 
   // Held as fields so the GC cannot collect buffers Win32 still points at.
   private readonly classNameBuf = wstr(CLASS_NAME);
@@ -57,7 +57,10 @@ export class Win32TrayController implements TrayController {
   private wndProc: bigint | null = null;
   private hwnd: unknown = null;
   private hIcon: unknown = null;
-  private ownsIcon = false;
+  private baseIcon: unknown = null;
+  private connectedIcon: unknown = null;
+  private disconnectedIcon: unknown = null;
+  private readonly loadedIcons: unknown[] = [];
   private classRegistered = false;
   private pump: NodeJS.Timeout | null = null;
   private taskbarCreatedMessage = 0;
@@ -66,10 +69,10 @@ export class Win32TrayController implements TrayController {
   private iconAdded = false;
   private status: TrayStatus = { state: 'STARTING', reader: null };
 
-  constructor(options: TrayOptions, log: Logger, iconPath: string | null) {
+  constructor(options: TrayOptions, log: Logger, icons: TrayIcons) {
     this.options = options;
     this.log = log;
-    this.iconPath = iconPath;
+    this.icons = icons;
   }
 
   start(): void {
@@ -90,14 +93,23 @@ export class Win32TrayController implements TrayController {
   }
 
   setStatus(status: TrayStatus): void {
+    const wasConnected = isReaderConnected(this.status);
     this.status = status;
     if (!this.iconAdded || !this.api) {
       return;
     }
+
+    const nowConnected = isReaderConnected(status);
+    let flags = NIF_TIP;
+    if (nowConnected !== wasConnected) {
+      this.hIcon = this.iconForStatus();
+      flags |= NIF_ICON;
+    }
+
     try {
-      this.api.Shell_NotifyIconW(NIM_MODIFY, this.buildIconData(NIF_TIP));
+      this.api.Shell_NotifyIconW(NIM_MODIFY, this.buildIconData(flags));
     } catch (err) {
-      this.log.debug(`Tray tooltip update failed: ${String(err)}`);
+      this.log.debug(`Tray status update failed: ${String(err)}`);
     }
   }
 
@@ -112,10 +124,14 @@ export class Win32TrayController implements TrayController {
       return;
     }
     try {
-      if (this.hIcon && this.ownsIcon) {
-        api.DestroyIcon(this.hIcon);
+      for (const icon of this.loadedIcons) {
+        api.DestroyIcon(icon);
       }
+      this.loadedIcons.length = 0;
       this.hIcon = null;
+      this.baseIcon = null;
+      this.connectedIcon = null;
+      this.disconnectedIcon = null;
       if (this.hwnd) {
         api.DestroyWindow(this.hwnd);
         this.hwnd = null;
@@ -230,20 +246,40 @@ export class Win32TrayController implements TrayController {
 
   // --- icon --------------------------------------------------------------
 
+  private loadIconFile(path: string | null): unknown {
+    if (!path) {
+      return null;
+    }
+    const api = this.requireApi();
+    const cx = Number(api.GetSystemMetrics(SM_CXSMICON)) || 16;
+    const cy = Number(api.GetSystemMetrics(SM_CYSMICON)) || 16;
+    const handle = api.LoadImageW(null, wstr(path), IMAGE_ICON, cx, cy, LR_LOADFROMFILE);
+    if (!handle) {
+      this.log.warn(`Could not load the tray icon from ${path}.`);
+      return null;
+    }
+    this.loadedIcons.push(handle);
+    return handle;
+  }
+
   private loadIcon(): void {
     const api = this.requireApi();
-    if (this.iconPath) {
-      const cx = Number(api.GetSystemMetrics(SM_CXSMICON)) || 16;
-      const cy = Number(api.GetSystemMetrics(SM_CYSMICON)) || 16;
-      this.hIcon = api.LoadImageW(null, wstr(this.iconPath), IMAGE_ICON, cx, cy, LR_LOADFROMFILE);
-      if (this.hIcon) {
-        this.ownsIcon = true;
-        return;
-      }
-      this.log.warn(`Could not load the tray icon from ${this.iconPath}; using the default icon.`);
+    this.connectedIcon = this.loadIconFile(this.icons.connected);
+    this.disconnectedIcon = this.loadIconFile(this.icons.disconnected);
+    this.baseIcon = this.loadIconFile(this.icons.base);
+
+    if (!this.connectedIcon && !this.disconnectedIcon && !this.baseIcon) {
+      // Nothing usable on disk: fall back to the stock Windows application
+      // icon so there is still something in the tray.
+      this.baseIcon = api.LoadIconW(null, api.idiApplication);
     }
-    this.hIcon = api.LoadIconW(null, api.idiApplication);
-    this.ownsIcon = false;
+    this.hIcon = this.iconForStatus();
+  }
+
+  /** Badged variant when available, otherwise the plain brand icon. */
+  private iconForStatus(): unknown {
+    const wanted = isReaderConnected(this.status) ? this.connectedIcon : this.disconnectedIcon;
+    return wanted ?? this.baseIcon;
   }
 
   private buildIconData(flags: number): unknown {
