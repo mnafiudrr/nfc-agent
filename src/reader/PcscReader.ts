@@ -1,6 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { NFC } from 'nfc-pcsc';
 import { normalizeUid } from '../utils/uid.js';
+import { ReaderProbe } from './ReaderProbe.js';
 import type { Logger } from '../logger.js';
 
 export interface PcscReaderEvents {
@@ -22,11 +23,13 @@ export interface NfcCard {
 export class PcscReader {
   private readonly emitter = new EventEmitter();
   private readonly log: Logger;
+  private readonly probe: ReaderProbe;
   private nfc: NFC | null = null;
   private started = false;
 
-  constructor(log: Logger) {
+  constructor(log: Logger, probe?: ReaderProbe) {
     this.log = log;
+    this.probe = probe ?? new ReaderProbe(log);
   }
 
   on<K extends keyof PcscReaderEvents>(event: K, listener: PcscReaderEvents[K]): void {
@@ -38,6 +41,16 @@ export class PcscReader {
       return;
     }
     this.started = true;
+    // NFC() blocks forever when the Windows Smart Card service is stopped, so
+    // wait until a reader actually exists before constructing it.
+    this.probe.waitForReaders(() => {
+      if (this.started) {
+        this.initNfc();
+      }
+    });
+  }
+
+  private initNfc(): void {
     const nfc = new NFC();
     this.nfc = nfc;
 
@@ -85,6 +98,7 @@ export class PcscReader {
       return;
     }
     this.started = false;
+    this.probe.stop();
     if (this.nfc) {
       try {
         this.nfc.close();

@@ -34,11 +34,30 @@ npm run dev                  # watch mode (tsx)
 
 Configuration via environment variables (sensible defaults):
 
-| Env         | Default     | Description                            |
-| ----------- | ----------- | -------------------------------------- |
-| `WS_HOST`   | `127.0.0.1` | WebSocket bind host (loopback only)    |
-| `WS_PORT`   | `8765`      | WebSocket port                         |
-| `LOG_LEVEL` | `info`      | `debug` \| `info` \| `warn` \| `error` |
+| Env         | Default     | Description                                |
+| ----------- | ----------- | ------------------------------------------ |
+| `WS_HOST`   | `127.0.0.1` | WebSocket bind host (loopback only)        |
+| `WS_PORT`   | `8765`      | WebSocket port                             |
+| `LOG_LEVEL` | `info`      | `debug` \| `info` \| `warn` \| `error`     |
+| `LOG_FILE`  | per-OS path | Log file path; empty disables file logging |
+
+### Versioning
+
+One patch bump per change. Before committing:
+
+```bash
+npm run bump   # 0.1.1 -> 0.1.2, and regenerates src/version.ts
+```
+
+Commit `package.json`, `package-lock.json` and `src/version.ts` together with the change they describe.
+
+`src/version.ts` is **generated** — never edit it by hand. The version is baked in at bump time rather than
+read from `package.json` at runtime, because `package.json` is not reliably reachable from inside the pkg
+ESM snapshot. `npm run bump` regenerates it through npm's `version` lifecycle hook, and both `npm test` and
+`npm run build:exe` fail if the two ever disagree.
+
+`npm version` is run with `--no-git-tag-version`, so it touches no git state: no commit, no tag, and it
+works with a dirty working tree.
 
 ### Quality commands
 
@@ -69,6 +88,36 @@ Node.js is **not** required. Do this in order — most machines need no driver i
 4. Run `acr122u-agent.exe` — it binds to `ws://127.0.0.1:8765` and emits `card_detected` events with the
    normalized UID.
 
+The agent runs **in the system tray, with no console window** — there is no terminal to close by accident.
+
+| Action                   | What happens                                                                          |
+| ------------------------ | ------------------------------------------------------------------------------------- |
+| Tray icon badge          | **Green dot** when the reader is attached, **red dot** when it is not                 |
+| Reader plugged/unplugged | A notification: _Device is plugged_ / _Device is unplugged_                           |
+| **Left-click** the icon  | Opens a live log window. Closing that window does **not** stop the agent              |
+| **Right-click** the icon | Menu: status · **Show log** · **Open log folder** · **Copy WebSocket URL** · **Quit** |
+
+Quitting from the tray menu is the intended way to stop the agent.
+
+> The agent pins its own icon to the taskbar on first run. Windows 11 otherwise hides every new tray icon
+> behind the `^` chevron, which looks like the agent failed to start. If you drag the icon back into the
+> overflow, it stays there — the agent will not re-pin it.
+
+> The **file** icon in Explorer is still Node's hexagon, not the brand mark. pkg bakes the offset of its
+> bundled payload into the executable, so editing the icon afterwards corrupts it; see
+> [docs/plans/windows-tray.md §5.8](docs/plans/windows-tray.md). The tray icon is the brand mark.
+
+Because there is no console, logs go to a file instead:
+
+| Platform | Log file                                      |
+| -------- | --------------------------------------------- |
+| Windows  | `%LOCALAPPDATA%\acr122u-agent\logs\agent.log` |
+| macOS    | `~/Library/Logs/acr122u-agent/agent.log`      |
+
+Logs rotate at 5 MB and keep three files. Set `LOG_FILE` to write elsewhere, or to an empty value to turn
+file logging off. Launching the exe a second time is a no-op: it logs `Agent already running` and exits,
+leaving the first instance untouched.
+
 You do **not** need to start or enable the Windows **Smart Card** service (`SCardSvr`). It is part of
 Windows and is trigger-started on smart-card-reader device arrival, so seeing it `Stopped` before the
 reader is plugged in is normal.
@@ -93,7 +142,20 @@ Install it with `winget install --id Python.Python.3.12 -e --scope user`. Note t
 Windows puts on `PATH` at `%LOCALAPPDATA%\Microsoft\WindowsApps` is a 0-byte Microsoft Store
 placeholder, not an interpreter - node-gyp fails with `find Python ... version is ""` if that is all it finds.
 
-Output: `dist\bin\win-x64\acr122u-agent.exe` — a single self-contained 64-bit executable.
+Output — two files, byte-identical, in `dist\bin\win-x64\`:
+
+| File                       | Purpose                                                       |
+| -------------------------- | ------------------------------------------------------------- |
+| `acr122u-agent-v0.1.1.exe` | The versioned artifact. Archive this, attach it to a release. |
+| `acr122u-agent.exe`        | Stable name. **Install and run this one.**                    |
+
+Run the stable name, not the versioned one. The tray-pinning logic keys off the executable's path, so a
+filename that changes every release makes Windows treat the agent as a brand-new app each time — it gets
+re-pinned to the taskbar, and a deliberate unpin does not survive the upgrade. The running agent reports
+its version in the log and in the tray menu regardless of which file you launched.
+
+Earlier versioned builds are deleted on each build; pass `-KeepVersions 3` to retain more, or
+`-NoStableCopy` to skip the stable copy.
 
 Useful switches:
 

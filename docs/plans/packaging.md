@@ -14,11 +14,11 @@ Packaging must still work against the physical ACR122U through PC/SC, which is t
 
 ## 2. Build requirements
 
-| Tool | Where | Purpose |
-| ---- | ----- | ------- |
-| Node.js + npm | dev machine | install deps, run `npm run build` (TS → `dist/`) |
-| A bundler/compiler | dev machine | produce single-binary executables |
-| PC/SC driver/lib | on the **target** machine | `pcsc-lite` (macOS) / on Windows `WinSCard.dll` + `SCardSvr` are built in, and the reader usually binds to the inbox CCID driver — ACS driver only as fallback |
+| Tool               | Where                     | Purpose                                                                                                                                                        |
+| ------------------ | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Node.js + npm      | dev machine               | install deps, run `npm run build` (TS → `dist/`)                                                                                                               |
+| A bundler/compiler | dev machine               | produce single-binary executables                                                                                                                              |
+| PC/SC driver/lib   | on the **target** machine | `pcsc-lite` (macOS) / on Windows `WinSCard.dll` + `SCardSvr` are built in, and the reader usually binds to the inbox CCID driver — ACS driver only as fallback |
 
 ## 3. Packaging strategies
 
@@ -47,22 +47,22 @@ Ship the Node runtime + `dist/` + `node_modules` (including the platform-specifi
 
 ### 4.1 macOS
 
-| # | Executable / artifact | Path | Notes |
-| - | --------------------- | ---- | ----- |
-| 1 | Application bundle | `dist-app/acr122u-agent.app/` | Drag to `/Applications` |
-| 2 | Bundle main binary | `dist-app/acr122u-agent.app/Contents/MacOS/acr122u-agent` | The launcher the OS executes |
-| 3 | Standalone CLI (arm64) | `dist/bin/darwin-arm64/acr122u-agent` | Apple Silicon |
-| 4 | Standalone CLI (x64) | `dist/bin/darwin-x64/acr122u-agent` | Intel |
-| 5 | Universal binary (optional) | `dist/bin/darwin-universal/acr122u-agent` | arm64 + x64 combined via `lipo` |
+| #   | Executable / artifact       | Path                                                      | Notes                           |
+| --- | --------------------------- | --------------------------------------------------------- | ------------------------------- |
+| 1   | Application bundle          | `dist-app/acr122u-agent.app/`                             | Drag to `/Applications`         |
+| 2   | Bundle main binary          | `dist-app/acr122u-agent.app/Contents/MacOS/acr122u-agent` | The launcher the OS executes    |
+| 3   | Standalone CLI (arm64)      | `dist/bin/darwin-arm64/acr122u-agent`                     | Apple Silicon                   |
+| 4   | Standalone CLI (x64)        | `dist/bin/darwin-x64/acr122u-agent`                       | Intel                           |
+| 5   | Universal binary (optional) | `dist/bin/darwin-universal/acr122u-agent`                 | arm64 + x64 combined via `lipo` |
 
 ### 4.2 Windows
 
-| # | Executable / artifact | Path | Notes |
-| - | --------------------- | ---- | ----- |
-| 1 | CLI executable (x64) | `dist/bin/win-x64/acr122u-agent.exe` | 64-bit |
-| 2 | CLI executable (x86) | `dist/bin/win-x86/acr122u-agent.exe` | 32-bit (optional) |
-| 3 | GUI/console launcher | `dist/launcher/acr122u-agent-launcher.exe` | Starts the agent on login (optional) |
-| 4 | Installer (optional) | `dist/setup/acr122u-agent-setup.exe` | Inno Setup / WiX / NSIS output |
+| #   | Executable / artifact | Path                                       | Notes                                |
+| --- | --------------------- | ------------------------------------------ | ------------------------------------ |
+| 1   | CLI executable (x64)  | `dist/bin/win-x64/acr122u-agent.exe`       | 64-bit                               |
+| 2   | CLI executable (x86)  | `dist/bin/win-x86/acr122u-agent.exe`       | 32-bit (optional)                    |
+| 3   | GUI/console launcher  | `dist/launcher/acr122u-agent-launcher.exe` | Starts the agent on login (optional) |
+| 4   | Installer (optional)  | `dist/setup/acr122u-agent-setup.exe`       | Inno Setup / WiX / NSIS output       |
 
 > `dist/bin/*` are the raw executables. The launcher and installer are optional convenience layers.
 
@@ -88,7 +88,8 @@ npm ci
 npm run build
 
 # x64
-npx @yao-pkg/pkg . --output dist/bin/win-x64/acr122u-agent.exe
+npx @yao-pkg/pkg . --output dist/bin/win-x64/acr122u-agent-v<version>.exe
+# plus a byte-identical copy at dist/bin/win-x64/acr122u-agent.exe (the one to run)
 ```
 
 > Requires the `pkg` config block in `package.json` and building **on Windows** — see [windows-exe.md](windows-exe.md) for prerequisites, config, and verification.
