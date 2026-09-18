@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { dirname } from 'node:path';
 import type { Logger } from '../logger.js';
+import { promoteTrayIcon } from './promote.js';
 import { tooltip } from './status.js';
 import type { TrayController, TrayOptions, TrayStatus } from './types.js';
 import {
@@ -80,6 +81,7 @@ export class Win32TrayController implements TrayController {
       this.pump = setInterval(() => this.drain(), PUMP_INTERVAL_MS);
       this.pump.unref();
       this.log.info('Tray icon started');
+      void this.pinToTaskbar();
     } catch (err) {
       // A missing tray must never stop the agent from reading cards.
       this.log.warn(`Tray icon unavailable, running without one: ${String(err)}`);
@@ -388,6 +390,21 @@ export class Win32TrayController implements TrayController {
       child.stdin?.end(text, 'utf8');
     } catch (err) {
       this.log.debug(`Clipboard copy failed: ${String(err)}`);
+    }
+  }
+
+  private async pinToTaskbar(): Promise<void> {
+    const changed = await promoteTrayIcon(this.log);
+    if (!changed || !this.iconAdded) {
+      return;
+    }
+    // Explorer reads IsPromoted when the icon is registered, so re-register it
+    // rather than making the user restart the agent to see the icon appear.
+    try {
+      this.removeIcon();
+      this.addIcon();
+    } catch (err) {
+      this.log.debug(`Could not re-add the tray icon after pinning: ${String(err)}`);
     }
   }
 
