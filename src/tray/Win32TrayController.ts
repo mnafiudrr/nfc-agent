@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { dirname } from 'node:path';
 import type { Logger } from '../logger.js';
 import { LogWindow } from './LogWindow.js';
+import { VERSION } from '../version.js';
 import { promoteTrayIcon } from './promote.js';
 import { isReaderConnected, tooltip } from './status.js';
 import type { TrayController, TrayIcons, TrayOptions, TrayStatus } from './types.js';
@@ -46,6 +47,7 @@ const INFO_TITLE_UNITS = 64;
 
 const ID_STATUS = 1;
 const ID_SHOW_LOG = 5;
+const ID_VERSION = 6;
 const ID_OPEN_LOGS = 2;
 const ID_COPY_URL = 3;
 const ID_QUIT = 4;
@@ -377,6 +379,10 @@ export class Win32TrayController implements TrayController {
 
       const label = tooltip(this.status).replace(/\n/g, ' - ');
       api.AppendMenuW(menu, MF_STRING | MF_GRAYED, ID_STATUS, wstr(label));
+      // Greyed, so TPM_RETURNCMD never returns this id and onMenuChoice needs
+      // no case for it. Kept out of the tooltip, which has a 127-unit budget
+      // the reader name needs.
+      api.AppendMenuW(menu, MF_STRING | MF_GRAYED, ID_VERSION, wstr(`Version ${VERSION}`));
       api.AppendMenuW(menu, MF_SEPARATOR, 0, null);
       api.AppendMenuW(menu, MF_STRING, ID_SHOW_LOG, wstr('Show log'));
       if (this.options.logFile) {

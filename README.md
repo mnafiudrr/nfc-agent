@@ -41,6 +41,24 @@ Configuration via environment variables (sensible defaults):
 | `LOG_LEVEL` | `info`      | `debug` \| `info` \| `warn` \| `error`     |
 | `LOG_FILE`  | per-OS path | Log file path; empty disables file logging |
 
+### Versioning
+
+One patch bump per change. Before committing:
+
+```bash
+npm run bump   # 0.1.1 -> 0.1.2, and regenerates src/version.ts
+```
+
+Commit `package.json`, `package-lock.json` and `src/version.ts` together with the change they describe.
+
+`src/version.ts` is **generated** — never edit it by hand. The version is baked in at bump time rather than
+read from `package.json` at runtime, because `package.json` is not reliably reachable from inside the pkg
+ESM snapshot. `npm run bump` regenerates it through npm's `version` lifecycle hook, and both `npm test` and
+`npm run build:exe` fail if the two ever disagree.
+
+`npm version` is run with `--no-git-tag-version`, so it touches no git state: no commit, no tag, and it
+works with a dirty working tree.
+
 ### Quality commands
 
 ```bash
@@ -124,7 +142,20 @@ Install it with `winget install --id Python.Python.3.12 -e --scope user`. Note t
 Windows puts on `PATH` at `%LOCALAPPDATA%\Microsoft\WindowsApps` is a 0-byte Microsoft Store
 placeholder, not an interpreter - node-gyp fails with `find Python ... version is ""` if that is all it finds.
 
-Output: `dist\bin\win-x64\acr122u-agent.exe` — a single self-contained 64-bit executable.
+Output — two files, byte-identical, in `dist\bin\win-x64\`:
+
+| File                       | Purpose                                                       |
+| -------------------------- | ------------------------------------------------------------- |
+| `acr122u-agent-v0.1.1.exe` | The versioned artifact. Archive this, attach it to a release. |
+| `acr122u-agent.exe`        | Stable name. **Install and run this one.**                    |
+
+Run the stable name, not the versioned one. The tray-pinning logic keys off the executable's path, so a
+filename that changes every release makes Windows treat the agent as a brand-new app each time — it gets
+re-pinned to the taskbar, and a deliberate unpin does not survive the upgrade. The running agent reports
+its version in the log and in the tray menu regardless of which file you launched.
+
+Earlier versioned builds are deleted on each build; pass `-KeepVersions 3` to retain more, or
+`-NoStableCopy` to skip the stable copy.
 
 Useful switches:
 

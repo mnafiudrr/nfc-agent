@@ -21,7 +21,16 @@
 
 .PARAMETER Output
     Output path for the executable.
-    Default: dist\bin\win-x64\acr122u-agent.exe
+    Default: dist\bin\win-x64\acr122u-agent-v<version>.exe, where <version> is
+    the "version" field of package.json.
+
+.PARAMETER NoStableCopy
+    Do not also write the unversioned dist\bin\win-x64\acr122u-agent.exe copy.
+
+.PARAMETER KeepVersions
+    How many versioned executables to keep in the output folder (default 1, i.e.
+    only the one just built). Older ones are deleted after a successful build.
+    0 disables pruning.
 
 .PARAMETER Fallback
     Skip pkg entirely and produce the bundled-runtime distribution described in
@@ -42,7 +51,12 @@
 param(
     [switch]$SkipInstall,
     [string]$Target,
-    [string]$Output = 'dist\bin\win-x64\acr122u-agent.exe',
+    # Empty = derive dist\bin\win-x64\acr122u-agent-v<version>.exe from
+    # package.json once the repo root is known. A param default cannot do it:
+    # defaults bind before the Set-Location $RepoRoot further down.
+    [string]$Output = '',
+    [switch]$NoStableCopy,
+    [int]$KeepVersions = 1,
     [switch]$Fallback,
     [switch]$NoSmokeTest
 )
@@ -169,12 +183,75 @@ function Set-PeSubsystemGui {
     Write-Ok "Subsystem 3 -> 2 at offset 0x$($subOff.ToString('X')) - the exe runs with no console."
 }
 
+# Reads the "version" field out of package.json.
+#
+# NOTE: under Set-StrictMode -Version Latest, $json.version THROWS when the
+# property is absent. Indexing PSObject.Properties returns $null instead, which
+# is what lets this fail with a useful message rather than a stack trace.
+function Get-PackageVersion {
+    param([Parameter(Mandatory)][string]$Path)
+
+    if (-not (Test-Path -LiteralPath $Path)) { Fail "package.json not found at $Path" }
+
+    try {
+        $json = Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json
+    }
+    catch {
+        Fail "Could not parse $Path as JSON: $($_.Exception.Message)"
+    }
+
+    $prop = $json.PSObject.Properties['version']
+    if (-not $prop) { Fail "$Path has no ""version"" field." }
+
+    $value = [string]$prop.Value
+    if ($value -notmatch '^\d+\.\d+\.\d+([-+][0-9A-Za-z.\-+]+)?$') {
+        Fail "package.json version '$value' is not a semver triple." @('Bump it with: npm run bump')
+    }
+    return $value
+}
+
+# The version in the exe's filename and the VERSION constant compiled into it
+# must agree. An exe named v0.1.2 that reports v0.1.1 is worse than no version
+# at all, so this fails the build rather than warning.
+function Assert-VersionInSync {
+    param(
+        [Parameter(Mandatory)][string]$RepoRootPath,
+        [Parameter(Mandatory)][string]$Version
+    )
+
+    $file = Join-Path $RepoRootPath 'src\version.ts'
+    if (-not (Test-Path -LiteralPath $file)) {
+        Fail 'src\version.ts is missing.' @('Generate it with: node scripts\write-version.mjs')
+    }
+
+    $match = [regex]::Match((Get-Content -LiteralPath $file -Raw), "VERSION\s*=\s*'([^']+)'")
+    if (-not $match.Success) { Fail 'Could not find the VERSION constant in src\version.ts.' }
+
+    if ($match.Groups[1].Value -ne $Version) {
+        Fail "src\version.ts says $($match.Groups[1].Value) but package.json says $Version." @(
+            'Re-sync them with: node scripts\write-version.mjs',
+            'Bump both with:    npm run bump'
+        )
+    }
+}
+
 # --- 0. context ------------------------------------------------------------
 
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $RepoRoot
+
+# Resolved here, before the slow steps, so a stale src\version.ts fails in
+# seconds rather than after npm ci and pkg have run.
+$Version = Get-PackageVersion (Join-Path $RepoRoot 'package.json')
+Assert-VersionInSync -RepoRootPath $RepoRoot -Version $Version
+
+if ([string]::IsNullOrWhiteSpace($Output)) {
+    $Output = Join-Path 'dist\bin\win-x64' "acr122u-agent-v$Version.exe"
+}
+
 Write-Host "ACR122U Local Agent - Windows x64 build" -ForegroundColor White
 Write-Host "Repo: $RepoRoot" -ForegroundColor DarkGray
+Write-Host "Version: $Version" -ForegroundColor DarkGray
 
 # --- 1. environment checks -------------------------------------------------
 
@@ -326,9 +403,24 @@ if ($Fallback) {
 "%~dp0node.exe" "%~dp0app\dist\index.js" %*
 '@ | Set-Content -Encoding ASCII "$runtimeRoot\run.bat"
 
-    $zip = 'dist-runtime\acr122u-agent-win-x64.zip'
+    # $runtimeRoot stays unversioned: it is scratch staging, wiped on every run.
+    # Only the distributable zip carries the version.
+    $zip = "dist-runtime\acr122u-agent-win-x64-v$Version.zip"
     if (Test-Path $zip) { Remove-Item -Force $zip }
     Compress-Archive -Path "$runtimeRoot\*" -DestinationPath $zip
+
+    if ($KeepVersions -gt 0) {
+        $staleZips = @(
+            Get-ChildItem -LiteralPath 'dist-runtime' -Filter 'acr122u-agent-win-x64-v*.zip' -File -ErrorAction SilentlyContinue |
+                Where-Object { $_.Name -ine ([IO.Path]::GetFileName($zip)) } |
+                Sort-Object LastWriteTime -Descending |
+                Select-Object -Skip ([Math]::Max(0, $KeepVersions - 1))
+        )
+        foreach ($old in $staleZips) {
+            Remove-Item -LiteralPath $old.FullName -Force -ErrorAction SilentlyContinue
+            Write-Ok "Pruned $($old.Name)"
+        }
+    }
 
     $zipSize = [math]::Round((Get-Item $zip).Length / 1MB, 1)
     Write-Ok "$runtimeRoot\run.bat"
@@ -367,6 +459,31 @@ Write-Step 'Switching the executable to the Windows GUI subsystem'
 # PE *resources* - to set a custom icon, say - does move sections and silently
 # breaks the exe; see docs/plans/windows-tray.md.
 Set-PeSubsystemGui -Path $Output
+
+# --- 5d. stable-name copy -------------------------------------------------
+
+$stablePath = $null
+$stableFailed = $false
+
+if (-not $NoStableCopy -and ([IO.Path]::GetFileName($Output) -ine 'acr122u-agent.exe')) {
+    Write-Step 'Refreshing the stable-name copy'
+
+    $stablePath = Join-Path (Split-Path -Parent $Output) 'acr122u-agent.exe'
+    try {
+        # Copied after the subsystem patch, so the copy is already GUI-subsystem
+        # and byte-identical - no second patch, no second verification.
+        Copy-Item -LiteralPath $Output -Destination $stablePath -Force
+        Write-Ok "$stablePath (byte-identical copy)"
+    }
+    catch {
+        # Expected whenever the agent is sitting in the tray from a previous
+        # build. The versioned exe is the real output, so warn and carry on.
+        $stableFailed = $true
+        Write-Warn2 "Could not refresh ${stablePath}: $($_.Exception.Message)"
+        Write-Warn2 'It is most likely still running - quit it from the tray icon and re-run.'
+        Write-Warn2 'The versioned executable built fine and is unaffected.'
+    }
+}
 
 # --- 6. smoke test ---------------------------------------------------------
 
@@ -429,8 +546,44 @@ if (-not $NoSmokeTest) {
     }
 }
 
+# --- 6b. prune older versioned executables --------------------------------
+
+# Runs only after the build and smoke test have succeeded, so a failed build
+# never deletes the last exe that worked.
+if ($KeepVersions -gt 0 -and $outDir -and (Test-Path -LiteralPath $outDir)) {
+    $currentName = [IO.Path]::GetFileName($Output)
+    # The -v glob means the stable acr122u-agent.exe is never a candidate.
+    # @() matters: a single result is a scalar and .Count throws under StrictMode.
+    $stale = @(
+        Get-ChildItem -LiteralPath $outDir -Filter 'acr122u-agent-v*.exe' -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -ine $currentName } |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -Skip ([Math]::Max(0, $KeepVersions - 1))
+    )
+    if ($stale.Count -gt 0) {
+        Write-Step "Pruning older executables (keeping $KeepVersions)"
+        foreach ($old in $stale) {
+            Remove-Item -LiteralPath $old.FullName -Force -ErrorAction SilentlyContinue
+            if (Test-Path -LiteralPath $old.FullName) {
+                Write-Warn2 "$($old.Name) is in use and was not deleted."
+            }
+            else {
+                Write-Ok "Pruned $($old.Name)"
+            }
+        }
+    }
+}
+
 # --- 7. done ---------------------------------------------------------------
 
 Write-Host "`nDone: $Output" -ForegroundColor Green
+if ($stablePath -and -not $stableFailed) {
+    Write-Host "Also: $stablePath" -ForegroundColor Green
+    Write-Host 'Distribute and run the stable name. A changing filename makes Windows treat the' -ForegroundColor DarkGray
+    Write-Host 'tray icon as a new app and re-pin it, losing a deliberate unpin (see src\tray\promote.ts).' -ForegroundColor DarkGray
+}
+elseif ($stableFailed) {
+    Write-Host "NOT refreshed: $stablePath (still running)" -ForegroundColor Yellow
+}
 Write-Host 'Next: install the ACS ACR122U driver on the target machine, run the exe, tap a card.' -ForegroundColor DarkGray
 Write-Host 'Full checklist: docs\tasks\007-manual-hardware-testing.md' -ForegroundColor DarkGray

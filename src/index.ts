@@ -5,6 +5,7 @@ import { ReaderManagerImpl } from './reader/ReaderManager.js';
 import { createTrayController } from './tray/createTray.js';
 import { NoopTrayController } from './tray/NoopTrayController.js';
 import type { TrayController } from './tray/types.js';
+import { VERSION } from './version.js';
 import { WebSocketServer } from './websocket/WebSocketServer.js';
 
 const config = loadConfig();
@@ -54,7 +55,10 @@ async function shutdown(reason: string): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  log.info('Agent started');
+  // "Agent started" must stay the prefix: the build script's smoke test greps
+  // the log for that exact substring.
+  log.info(`Agent started (v${VERSION})`);
+  log.info(`Executable: ${process.execPath}`);
   if (config.logFile !== null) {
     log.info(`Logging to ${config.logFile}`);
   }

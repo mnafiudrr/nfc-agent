@@ -1,6 +1,6 @@
 {
   "name": "acr122u-agent",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Standalone cross-platform background agent for the ACR122U-A9 NFC reader over PC/SC with a local WebSocket server",
   "type": "module",
   "main": "dist/index.js",
@@ -11,6 +11,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "build:exe": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-win-exe.ps1",
+    "bump": "npm version patch --no-git-tag-version",
+    "version": "node scripts/write-version.mjs",
     "start": "node dist/index.js",
     "dev": "tsx watch src/index.ts",
     "test": "tsx --test \"test/**/*.test.ts\"",
