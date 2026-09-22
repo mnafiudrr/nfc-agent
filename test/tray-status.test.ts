@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { APP_NAME } from '../src/app.js';
 import { MAX_TOOLTIP_LENGTH, statusLabel, tooltip } from '../src/tray/status.js';
 import { NoopTrayController } from '../src/tray/NoopTrayController.js';
 import { createTrayController } from '../src/tray/createTray.js';
@@ -28,7 +29,10 @@ test('status label degrades gracefully when the reader is unknown', () => {
 
 test('tooltip carries the app name and the state', () => {
   const text = tooltip({ state: 'CARD_PRESENT', reader });
-  assert.match(text, /^ACR122U Agent\n/);
+  assert.ok(
+    text.startsWith(`${APP_NAME}\n`),
+    `tooltip should lead with the app name, got: ${text}`,
+  );
   assert.match(text, /Card present/);
 });
 
@@ -62,5 +66,5 @@ test('non-windows platforms get the noop controller', async () => {
 
 test('noop controller accepts notifications without side effects', () => {
   const tray = new NoopTrayController();
-  assert.doesNotThrow(() => tray.notify('ACR122U Agent', 'Device is plugged'));
+  assert.doesNotThrow(() => tray.notify(APP_NAME, 'Device is plugged'));
 });

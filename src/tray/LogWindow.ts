@@ -1,3 +1,4 @@
+import { APP_NAME } from '../app.js';
 import type { BufferedLogSink, Logger } from '../logger.js';
 import {
   CW_USEDEFAULT,
@@ -27,7 +28,7 @@ import {
 } from './win32.js';
 
 const CLASS_NAME = 'Acr122uAgentLogWindow';
-const TITLE = 'ACR122U Agent - Log';
+const TITLE = `${APP_NAME} - Log`;
 const WIDTH = 900;
 const HEIGHT = 520;
 

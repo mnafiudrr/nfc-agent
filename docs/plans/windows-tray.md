@@ -162,6 +162,22 @@ The subsystem patch (§4.1) is safe for the opposite reason: it flips two bytes 
 
 The tray icon — what users actually see while the agent runs — is the brand icon. Only the file icon in Explorer stays Node's hexagon. Changing that needs a different packager, or the `-Fallback` bundled-runtime layout, where `node.exe` is a plain copy with no overlay and can be stamped safely.
 
+### 5.9 The Task Manager name, which _is_ achievable
+
+Task Manager's **Name** column shows a process's PE `FileDescription`, and pkg's base binary carries Node's, so the agent appeared as _Node.js JavaScript Runtime_.
+
+The icon could not be fixed because a resource **rewrite** grows the section table. A resource **overwrite** does not: `Set-ExeFileDescription` in `scripts/build-win-exe.ps1` finds the existing UTF-16 string where it already sits in `.rsrc` and writes over it, padded with spaces to exactly the original length. No section grows, no offset changes, and pkg's payload is untouched — verified by running the patched exe.
+
+This is why the two cases differ, and the constraint is a hard one:
+
+|                    | Icon                                         | FileDescription                  |
+| ------------------ | -------------------------------------------- | -------------------------------- |
+| Needs              | New resource data, larger than what is there | Same-length replacement in place |
+| Effect on sections | `.rsrc` grows, everything after it moves     | Nothing moves                    |
+| Works with pkg     | No                                           | Yes                              |
+
+`ASRI Living ACR122 Agent` is 24 characters against the 26 of `Node.js JavaScript Runtime`, so it fits. A longer name would not, and the build warns and leaves the stock description rather than corrupting the file. `ProductName` is only `Node.js` (7 characters) and cannot be expanded this way, so it still reads Node.js — Task Manager does not surface it.
+
 ## 6. Architecture fit
 
 - New `src/tray/` module exposing a `TrayController` interface, mirroring how `ReaderManager` hides PC/SC from the rest of the app.

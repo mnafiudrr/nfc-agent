@@ -1,3 +1,4 @@
+import { APP_NAME } from './app.js';
 import { loadConfig } from './config.js';
 import { BufferedLogSink, ConsoleSink, FileSink, Logger, type LogSink } from './logger.js';
 import { PcscReader } from './reader/PcscReader.js';
@@ -55,9 +56,9 @@ async function shutdown(reason: string): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  // "Agent started" must stay the prefix: the build script's smoke test greps
-  // the log for that exact substring.
-  log.info(`Agent started (v${VERSION})`);
+  // "Agent started" must remain a contiguous substring of this line: the build
+  // script's smoke test greps the log for it.
+  log.info(`${APP_NAME} started (v${VERSION})`);
   log.info(`Executable: ${process.execPath}`);
   if (config.logFile !== null) {
     log.info(`Logging to ${config.logFile}`);
@@ -97,11 +98,11 @@ async function main(): Promise<void> {
 
   readerManager.on('readerConnected', () => {
     refreshTray();
-    tray.notify('ACR122U Agent', 'Device is plugged');
+    tray.notify(APP_NAME, 'Device is plugged');
   });
   readerManager.on('readerDisconnected', () => {
     refreshTray();
-    tray.notify('ACR122U Agent', 'Device is unplugged');
+    tray.notify(APP_NAME, 'Device is unplugged');
   });
   readerManager.on('cardDetected', refreshTray);
   readerManager.on('cardRemoved', refreshTray);

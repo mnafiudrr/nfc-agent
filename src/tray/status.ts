@@ -1,10 +1,9 @@
+import { APP_NAME } from '../app.js';
 import type { TrayStatus } from './types.js';
 
 // Shell_NotifyIcon truncates szTip at 128 UTF-16 units including the
 // terminator, so keep tooltips comfortably under that.
 export const MAX_TOOLTIP_LENGTH = 127;
-
-const APP_NAME = 'ACR122U Agent';
 
 export function statusLabel({ state, reader }: TrayStatus): string {
   switch (state) {

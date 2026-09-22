@@ -89,6 +89,9 @@ Node.js is **not** required. Do this in order — most machines need no driver i
    normalized UID.
 
 The agent runs **in the system tray, with no console window** — there is no terminal to close by accident.
+It identifies itself as **ASRI Living ACR122 Agent** in the tray tooltip and menu, in its notifications and
+log, and in Task Manager. The package, the `%LOCALAPPDATA%\acr122u-agent` folder and the executable keep
+the `acr122u-agent` identifier.
 
 | Action                   | What happens                                                                          |
 | ------------------------ | ------------------------------------------------------------------------------------- |

@@ -183,6 +183,59 @@ function Set-PeSubsystemGui {
     Write-Ok "Subsystem 3 -> 2 at offset 0x$($subOff.ToString('X')) - the exe runs with no console."
 }
 
+# Task Manager's "Name" column shows a process's PE FileDescription, and pkg's
+# base binary carries Node's - so the agent appears as "Node.js JavaScript
+# Runtime". rcedit cannot fix that: rewriting PE resources moves the sections
+# and discards pkg's appended payload (docs/plans/windows-tray.md section 5.8).
+#
+# Instead this overwrites the UTF-16 string where it already sits in .rsrc,
+# padded to exactly the original length. Nothing moves: no section grows, no
+# offset changes, and pkg's payload is untouched.
+function Set-ExeFileDescription {
+    param(
+        [Parameter(Mandatory)][string]$Path,
+        [Parameter(Mandatory)][string]$Description
+    )
+
+    $original = 'Node.js JavaScript Runtime'
+
+    if ($Description.Length -gt $original.Length) {
+        Write-Warn2 "'$Description' is longer than the $($original.Length) characters available in place."
+        Write-Warn2 'Task Manager will keep showing the Node.js description.'
+        return
+    }
+
+    $resolved = (Resolve-Path -LiteralPath $Path).Path
+    $bytes = [System.IO.File]::ReadAllBytes($resolved)
+
+    $needle = [System.Text.Encoding]::Unicode.GetBytes($original)
+    $index = -1
+    $limit = $bytes.Length - $needle.Length
+    for ($i = 0; $i -le $limit; $i++) {
+        if ($bytes[$i] -ne $needle[0]) { continue }
+        $matched = $true
+        for ($j = 1; $j -lt $needle.Length; $j++) {
+            if ($bytes[$i + $j] -ne $needle[$j]) { $matched = $false; break }
+        }
+        if ($matched) { $index = $i; break }
+    }
+
+    if ($index -lt 0) {
+        # A future pkg base binary may describe itself differently. Not fatal.
+        Write-Warn2 "Could not find the Node.js FileDescription to rename in $Path."
+        Write-Warn2 'Task Manager will show the stock description; the build is otherwise fine.'
+        return
+    }
+
+    # Pad with spaces so the byte count is identical; trailing spaces do not show.
+    $padded = $Description.PadRight($original.Length, ' ')
+    $replacement = [System.Text.Encoding]::Unicode.GetBytes($padded)
+    [Array]::Copy($replacement, 0, $bytes, $index, $replacement.Length)
+    [System.IO.File]::WriteAllBytes($resolved, $bytes)
+
+    Write-Ok "Task Manager name set to '$Description'"
+}
+
 # Reads the "version" field out of package.json.
 #
 # NOTE: under Set-StrictMode -Version Latest, $json.version THROWS when the
@@ -459,6 +512,13 @@ Write-Step 'Switching the executable to the Windows GUI subsystem'
 # PE *resources* - to set a custom icon, say - does move sections and silently
 # breaks the exe; see docs/plans/windows-tray.md.
 Set-PeSubsystemGui -Path $Output
+
+# --- 5c2. name the process for Task Manager -------------------------------
+
+Write-Step 'Setting the Task Manager name'
+
+# Before the stable copy, so both files carry it.
+Set-ExeFileDescription -Path $Output -Description 'ASRI Living ACR122 Agent'
 
 # --- 5d. stable-name copy -------------------------------------------------
 

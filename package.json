@@ -1,6 +1,6 @@
 {
   "name": "acr122u-agent",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Standalone cross-platform background agent for the ACR122U-A9 NFC reader over PC/SC with a local WebSocket server",
   "type": "module",
   "main": "dist/index.js",
