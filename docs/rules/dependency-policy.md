@@ -10,6 +10,11 @@ Keep dependencies minimal. Every added dependency must justify its presence.
 
 - `nfc-pcsc` — PC/SC communication (required for the reader).
 - `ws` — WebSocket server.
+- `koffi` — FFI for the Windows tray icon (`Shell_NotifyIcon` and the surrounding Win32 calls). Added
+  because the agent runs windowless on Windows and needs a tray icon to stay visible and quittable. The
+  alternatives (`systray2`, `trayicon`) were unmaintained since 2022 and would each drop an unsigned helper
+  executable into temp and run it, which is an antivirus risk in the field. See
+  [../plans/windows-tray.md](../plans/windows-tray.md) §5.2.
 
 ## 3. Allowed dev
 

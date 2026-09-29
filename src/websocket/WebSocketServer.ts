@@ -53,12 +53,22 @@ export class WebSocketServer {
       });
     });
 
+    let listening = false;
+
     wss.on('error', (err: Error) => {
+      // Errors raised before 'listening' (EADDRINUSE, EACCES) are surfaced by
+      // rejecting start(); logging them here too would double-report them.
+      if (!listening) {
+        return;
+      }
       this.log.error(`WebSocket server error: ${err.message}`);
     });
 
     await new Promise<void>((resolve, reject) => {
-      wss.once('listening', resolve);
+      wss.once('listening', () => {
+        listening = true;
+        resolve();
+      });
       wss.once('error', reject);
     });
 
