@@ -91,7 +91,7 @@ Between Half A and Half B the only way to stop the agent is Task Manager. That i
 - Icon in the notification area, using `assets/asliv.ico`, with a green dot badge when a reader is attached and a red one when none is (§5.5).
 - Tooltip carrying the current `ReaderState`.
 - **Left-click → the live log window** (§5.6); right-click → menu.
-- Menu: **Status** (reader name / state, disabled label) · **Show log** · **Open log folder** · **Copy WebSocket URL** · **Quit**.
+- Menu: **Status** (reader name / state, disabled label) · version · **Show log** · **Open log folder** · **Copy WebSocket URL** · **Start with Windows** (checkbox, §5.10) · **Quit**.
 - Desktop notifications on plug and unplug (§5.7).
 - **Quit** calls the existing `shutdown()` in `index.ts`; no new teardown path.
 
@@ -178,6 +178,34 @@ This is why the two cases differ, and the constraint is a hard one:
 
 `ASRI Living ACR122 Agent` is 24 characters against the 26 of `Node.js JavaScript Runtime`, so it fits. A longer name would not, and the build warns and leaves the stock description rather than corrupting the file. `ProductName` is only `Node.js` (7 characters) and cannot be expanded this way, so it still reads Node.js — Task Manager does not surface it.
 
+### 5.10 Starting with Windows
+
+The agent is meant to be running whenever the machine is, without anyone launching it. `src/autostart.ts` writes one value to the per-user Run key on first run:
+
+```
+HKCU\Software\Microsoft\Windows\CurrentVersion\Run
+    ASRILivingACR122Agent    REG_SZ    "<path to acr122u-agent.exe>"
+```
+
+Mechanism chosen over the alternatives:
+
+| Option                  | Why not                                                                                                                      |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Windows Service         | Runs in session 0, where there is no desktop for the tray icon and PC/SC has its own problems (§10). Needs admin to install. |
+| Scheduled task at boot  | Same session-0 problem, and `schtasks` XML is far more to get wrong than one registry value.                                 |
+| Startup-folder shortcut | Needs a `.lnk`, which means COM or a WScript shell-out; the Run key is one `reg.exe` call.                                   |
+| **HKCU Run key**        | Per-user, no admin, starts inside the interactive session. Chosen.                                                           |
+
+Three behaviours worth keeping:
+
+- **On by default, once.** A marker file in the data directory records that first-run setup happened. Without it there is no way to distinguish "never configured" from "the user turned it off", and the agent would switch autostart back on at every launch — the same trap the taskbar pin avoids in §5.5.
+- **Repoint, don't duplicate.** If the recorded path is not the running executable — the agent moved, or a versioned build replaced the stable one — the value is rewritten rather than left pointing at a file that may be gone. This matters because the build prunes old versioned exes.
+- **Never for `node.exe`.** Under `node dist/index.js` the executable is Node itself; registering that would launch a bare REPL at login. `isAutostartSupported()` gates on the basename.
+
+Quoting the path is not optional: an install under `C:\Program Files\...` would otherwise be parsed as several arguments at login. Verified end to end through `reg.exe` — add, query, parse back, delete.
+
+This is **not** an installer. There is no MSI or setup wizard; the agent configures itself. A real installer remains out of scope (§10).
+
 ## 6. Architecture fit
 
 - New `src/tray/` module exposing a `TrayController` interface, mirroring how `ReaderManager` hides PC/SC from the rest of the app.
@@ -210,7 +238,7 @@ This is why the two cases differ, and the constraint is a hard one:
 | 1     | Subsystem patch · file sink · single-instance guard           | **Done** — [task 008](../tasks/008-headless-windows-mode.md) |
 | 2     | Tray icon, menu, Quit, status tooltip                         | **Done** — [task 009](../tasks/009-windows-system-tray.md)   |
 | 3     | Brand icon · taskbar pin · status badge · toasts · log window | **Done** — §5.5–§5.7                                         |
-| 4     | Start with Windows toggle                                     | Not started                                                  |
+| 4     | Start with Windows                                            | **Done** — §5.10                                             |
 
 Phases 1 and 2 are verified from the packaged exe. What remains is the manual pass in
 [../tasks/007-manual-hardware-testing.md](../tasks/007-manual-hardware-testing.md) tests 11–19: the icon

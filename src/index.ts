@@ -1,4 +1,11 @@
 import { APP_NAME } from './app.js';
+import {
+  disableAutostart,
+  enableAutostart,
+  ensureAutostartOnFirstRun,
+  isAutostartEnabled,
+  isAutostartSupported,
+} from './autostart.js';
 import { loadConfig } from './config.js';
 import { BufferedLogSink, ConsoleSink, FileSink, Logger, type LogSink } from './logger.js';
 import { PcscReader } from './reader/PcscReader.js';
@@ -26,6 +33,8 @@ const readerManager = new ReaderManagerImpl(pcsc, log);
 const wsServer = new WebSocketServer(readerManager, config, log);
 
 let tray: TrayController = new NoopTrayController();
+// Cached so the tray menu, which is built synchronously, can show a tick.
+let autostartEnabled = false;
 let shuttingDown = false;
 
 function isAddressInUse(err: unknown): boolean {
@@ -84,12 +93,34 @@ async function main(): Promise<void> {
     throw err;
   }
 
+  if (isAutostartSupported()) {
+    await ensureAutostartOnFirstRun(log, config.dataDir);
+    autostartEnabled = await isAutostartEnabled();
+  }
+
   tray = createTrayController(
     {
       wsUrl: `ws://${config.wsHost}:${config.wsPort}`,
       logFile: config.logFile,
       onQuit: () => void shutdown('tray Quit'),
       logBuffer,
+      ...(isAutostartSupported()
+        ? {
+            autostart: {
+              isEnabled: () => autostartEnabled,
+              setEnabled: (enabled: boolean) => {
+                // Flip the cached value first so the menu reflects the click
+                // immediately; the registry write is confirmed just after.
+                autostartEnabled = enabled;
+                void (enabled ? enableAutostart(log) : disableAutostart(log)).then((ok) => {
+                  if (!ok) {
+                    autostartEnabled = !enabled;
+                  }
+                });
+              },
+            },
+          }
+        : {}),
     },
     log,
     config.dataDir,

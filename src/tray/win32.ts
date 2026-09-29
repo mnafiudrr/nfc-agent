@@ -29,6 +29,8 @@ export const WM_CONTEXTMENU = 0x007b;
 export const MF_STRING = 0x0000;
 export const MF_GRAYED = 0x0001;
 export const MF_SEPARATOR = 0x0800;
+export const MF_CHECKED = 0x0008;
+export const MF_UNCHECKED = 0x0000;
 
 export const TPM_RIGHTBUTTON = 0x0002;
 export const TPM_NONOTIFY = 0x0080;

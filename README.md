@@ -93,12 +93,13 @@ It identifies itself as **ASRI Living ACR122 Agent** in the tray tooltip and men
 log, and in Task Manager. The package, the `%LOCALAPPDATA%\acr122u-agent` folder and the executable keep
 the `acr122u-agent` identifier.
 
-| Action                   | What happens                                                                          |
-| ------------------------ | ------------------------------------------------------------------------------------- |
-| Tray icon badge          | **Green dot** when the reader is attached, **red dot** when it is not                 |
-| Reader plugged/unplugged | A notification: _Device is plugged_ / _Device is unplugged_                           |
-| **Left-click** the icon  | Opens a live log window. Closing that window does **not** stop the agent              |
-| **Right-click** the icon | Menu: status · **Show log** · **Open log folder** · **Copy WebSocket URL** · **Quit** |
+| Action                   | What happens                                                                                                             |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| Tray icon badge          | **Green dot** when the reader is attached, **red dot** when it is not                                                    |
+| Reader plugged/unplugged | A notification: _Device is plugged_ / _Device is unplugged_                                                              |
+| **Left-click** the icon  | Opens a live log window. Closing that window does **not** stop the agent                                                 |
+| **Right-click** the icon | Menu: status · version · **Show log** · **Open log folder** · **Copy WebSocket URL** · **Start with Windows** · **Quit** |
+| Starts at login          | On by default, so the agent is running after a reboot without anyone launching it                                        |
 
 Quitting from the tray menu is the intended way to stop the agent.
 
@@ -109,6 +110,26 @@ Quitting from the tray menu is the intended way to stop the agent.
 > The **file** icon in Explorer is still Node's hexagon, not the brand mark. pkg bakes the offset of its
 > bundled payload into the executable, so editing the icon afterwards corrupts it; see
 > [docs/plans/windows-tray.md §5.8](docs/plans/windows-tray.md). The tray icon is the brand mark.
+
+#### Starting with Windows
+
+The agent registers itself to start at login the **first time it runs**, so nobody has to launch it again
+after a reboot. It writes one value under the per-user key:
+
+```
+HKCU\Software\Microsoft\Windows\CurrentVersion\Run
+    ASRILivingACR122Agent    REG_SZ    "<path to acr122u-agent.exe>"
+```
+
+Per-user, so it needs no administrator rights, and it starts in your desktop session - which the tray icon
+and PC/SC both require.
+
+Untick **Start with Windows** in the tray menu to turn it off. That choice sticks: the agent records that
+first-run setup already happened, so it will not quietly switch itself back on at the next launch. If the
+executable moves or is replaced by a differently named build, the entry is repointed at the running one so
+login never tries to start a file that is gone.
+
+This is not an installer. It is the agent configuring itself; there is no MSI or setup wizard.
 
 Because there is no console, logs go to a file instead:
 

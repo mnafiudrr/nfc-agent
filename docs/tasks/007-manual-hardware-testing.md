@@ -116,6 +116,26 @@ Expected: it starts, logs `No PC/SC reader detected yet. Waiting for one to be p
 badge, and **stays responsive** — a WebSocket client can still connect. Plugging the reader in then brings
 it to green without a restart. (Before this was fixed, the agent froze completely in this state.)
 
+**Test 25 — Starts with Windows**
+Run the installed exe once, then sign out and back in (or reboot).
+Expected: the agent is already running, tray icon present, without anyone launching it. Confirm the entry
+exists: `reg query "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v ASRILivingACR122Agent`.
+
+**Test 26 — Turning autostart off sticks**
+Untick **Start with Windows** in the tray menu, quit the agent, start it again.
+Expected: the menu item is still unticked and the Run entry is still absent. The agent must not switch it
+back on by itself.
+
+**Test 27 — Moving or upgrading the executable**
+With autostart on, quit the agent, move the exe to another folder, run it from there.
+Expected: the Run entry now points at the new path; the log says `Start with Windows pointed at ...;
+updating it to this executable.`
+
+**Test 28 — The app name**
+Expected: the tray tooltip and menu, the notifications and the log window title all read
+**ASRI Living ACR122 Agent**, the log's first line reads `ASRI Living ACR122 Agent started (v<version>)`,
+and Task Manager lists the process as **ASRI Living ACR122 Agent** rather than _Node.js JavaScript Runtime_.
+
 ## Checklist
 
 | Test | Expected                              | Observed | Pass |
@@ -144,3 +164,7 @@ it to green without a restart. (Before this was fixed, the agent froze completel
 | 22   | Live log window, newest last          |          |      |
 | 23   | Closing log keeps agent alive         |          |      |
 | 24   | Starts and stays alive with no reader |          |      |
+| 25   | Starts automatically at login         |          |      |
+| 26   | Autostart opt-out is respected        |          |      |
+| 27   | Run entry repoints when the exe moves |          |      |
+| 28   | App name correct in tray/log/TaskMgr  |          |      |

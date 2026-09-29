@@ -9,9 +9,11 @@ import type { TrayController, TrayIcons, TrayOptions, TrayStatus } from './types
 import {
   IMAGE_ICON,
   LR_LOADFROMFILE,
+  MF_CHECKED,
   MF_GRAYED,
   MF_SEPARATOR,
   MF_STRING,
+  MF_UNCHECKED,
   NIF_ICON,
   NIF_INFO,
   NIF_MESSAGE,
@@ -48,6 +50,7 @@ const INFO_TITLE_UNITS = 64;
 const ID_STATUS = 1;
 const ID_SHOW_LOG = 5;
 const ID_VERSION = 6;
+const ID_AUTOSTART = 7;
 const ID_OPEN_LOGS = 2;
 const ID_COPY_URL = 3;
 const ID_QUIT = 4;
@@ -389,6 +392,10 @@ export class Win32TrayController implements TrayController {
         api.AppendMenuW(menu, MF_STRING, ID_OPEN_LOGS, wstr('Open log folder'));
       }
       api.AppendMenuW(menu, MF_STRING, ID_COPY_URL, wstr('Copy WebSocket URL'));
+      if (this.options.autostart) {
+        const checked = this.options.autostart.isEnabled() ? MF_CHECKED : MF_UNCHECKED;
+        api.AppendMenuW(menu, MF_STRING | checked, ID_AUTOSTART, wstr('Start with Windows'));
+      }
       api.AppendMenuW(menu, MF_SEPARATOR, 0, null);
       api.AppendMenuW(menu, MF_STRING, ID_QUIT, wstr('Quit'));
 
@@ -437,6 +444,13 @@ export class Win32TrayController implements TrayController {
       case ID_COPY_URL:
         this.copyToClipboard(this.options.wsUrl);
         break;
+      case ID_AUTOSTART: {
+        const autostart = this.options.autostart;
+        if (autostart) {
+          autostart.setEnabled(!autostart.isEnabled());
+        }
+        break;
+      }
       case ID_QUIT:
         this.log.info('Quit selected from the tray menu');
         this.options.onQuit();
