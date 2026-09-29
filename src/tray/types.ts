@@ -19,6 +19,16 @@ export interface TrayOptions {
   onQuit: () => void;
   /** Backs the live log window; omit to disable it. */
   logBuffer?: BufferedLogSink;
+
+  /**
+   * Backs the "Start with Windows" menu item; omit to hide it. isEnabled is
+   * read while the menu is being built, so it must be synchronous - index.ts
+   * caches the registry state rather than querying it on each right-click.
+   */
+  autostart?: {
+    isEnabled: () => boolean;
+    setEnabled: (enabled: boolean) => void;
+  };
 }
 
 export interface TrayController {
